@@ -218,31 +218,36 @@ export const RestaurantDashboard: React.FC = () => {
       </head>
       <body>
         <div class="header">
-          <div class="title">${activeRestaurant.name}</div>
-          <div class="table">${order.orderType === 'takeaway' ? '🥡 TAKEOUT PACK' : order.orderType === 'both' ? `🍽️🥡 DINE-IN + TAKEOUT – ${order.tableNumber}` : order.tableNumber}</div>
+          <div class="title">${activeRestaurant?.name || 'Restaurant'}</div>
+          <div class="table">${order.orderType === 'takeaway' ? '🥡 TAKEOUT PACK' : order.orderType === 'both' ? `🍽️🥡 DINE-IN + TAKEOUT – ${order.tableNumber || 'Table'}` : (order.tableNumber || 'Table')}</div>
           <div>Ticket #${order.id}</div>
-          <div>${order.createdAt}</div>
-          <div>Guest: ${order.customerName}</div>
+          <div>${order.createdAt || ''}</div>
+          <div>Guest: ${order.customerName || 'Guest'}</div>
           ${order.customerPhone ? `<div>Tel: ${order.customerPhone}</div>` : ''}
           ${order.paymentMethod ? `<div>Pay: ${order.paymentMethod.toUpperCase()}</div>` : ''}
           ${order.orderType === 'takeaway' || order.orderType === 'both' ? `<div style="font-weight:bold; margin-top:4px;">* TAKEOUT PACKAGING (${order.packCount || 1}x)</div>` : ''}
         </div>
         <div>
-          ${order.items.map(i => `
-            <div class="item-row">
-              <span><strong>${i.quantity}x</strong> ${i.foodItem.name}</span>
-              <span>${activeRestaurant.design.currencySymbol}${(i.foodItem.price * i.quantity).toLocaleString()}</span>
-            </div>
-            ${i.notes ? `<div class="notes">* Note: ${i.notes}</div>` : ''}
-          `).join('')}
+          ${(Array.isArray(order.items) ? order.items : []).map((i: any) => {
+            const name = i?.foodItem?.name || i?.name || 'Item';
+            const price = Number(i?.foodItem?.price ?? i?.price ?? 0);
+            const qty = Number(i?.quantity) || 1;
+            return `
+              <div class="item-row">
+                <span><strong>${qty}x</strong> ${name}</span>
+                <span>${activeRestaurant?.design?.currencySymbol || '₦'}${(price * qty).toLocaleString()}</span>
+              </div>
+              ${i.notes ? `<div class="notes">* Note: ${i.notes}</div>` : ''}
+            `;
+          }).join('')}
         </div>
         <div class="totals">
-          ${order.subtotal ? `<div class="item-row"><span>Dishes Subtotal:</span><span>${activeRestaurant.design.currencySymbol}${order.subtotal.toLocaleString()}</span></div>` : ''}
-          ${order.packagingFee ? `<div class="item-row"><span>Takeout Packaging:</span><span>${activeRestaurant.design.currencySymbol}${order.packagingFee.toLocaleString()}</span></div>` : ''}
-          ${order.vat ? `<div class="item-row"><span>VAT (7.5%):</span><span>${activeRestaurant.design.currencySymbol}${order.vat.toLocaleString()}</span></div>` : ''}
+          ${order.subtotal ? `<div class="item-row"><span>Dishes Subtotal:</span><span>${activeRestaurant?.design?.currencySymbol || '₦'}${Number(order.subtotal).toLocaleString()}</span></div>` : ''}
+          ${order.packagingFee ? `<div class="item-row"><span>Takeout Packaging:</span><span>${activeRestaurant?.design?.currencySymbol || '₦'}${Number(order.packagingFee).toLocaleString()}</span></div>` : ''}
+          ${order.vat ? `<div class="item-row"><span>VAT (7.5%):</span><span>${activeRestaurant?.design?.currencySymbol || '₦'}${Number(order.vat).toLocaleString()}</span></div>` : ''}
           <div class="item-row" style="font-size: 15px; font-weight: bold;">
             <span>TOTAL:</span>
-            <span>${activeRestaurant.design.currencySymbol}${order.total.toLocaleString()}</span>
+            <span>${activeRestaurant?.design?.currencySymbol || '₦'}${Number(order.total || 0).toLocaleString()}</span>
           </div>
         </div>
         <div class="footer">
@@ -372,7 +377,7 @@ export const RestaurantDashboard: React.FC = () => {
       ? activeRestaurant.tableLimit  // admin override wins
       : (planConfig?.maxTables ?? null);
 
-  const currentTableCount = activeRestaurant.tables.length;
+  const currentTableCount = (activeRestaurant?.tables || []).length;
   const isAtTableLimit = effectiveTableLimit !== null && currentTableCount >= effectiveTableLimit;
   const remainingTables = effectiveTableLimit !== null ? Math.max(0, effectiveTableLimit - currentTableCount) : Infinity;
   const planDisplayName = planConfig?.name || 'Basic';
@@ -840,7 +845,7 @@ export const RestaurantDashboard: React.FC = () => {
           activeOrdersCount={activeOrders.length}
           waiterCallsCount={restaurantCalls.length}
           totalDishesCount={allDishes.length}
-          totalTablesCount={activeRestaurant.tables.length}
+          totalTablesCount={(activeRestaurant?.tables || []).length}
           isTestingChime={testingChime}
           onTestChime={handleTestChime}
         />
@@ -945,7 +950,7 @@ export const RestaurantDashboard: React.FC = () => {
               </span>
             </div>
             <div className="text-xs text-neutral-500 font-mono mt-1 truncate">
-              {allDishes.length} Dishes · {activeRestaurant.tables.length} Tables
+              {allDishes.length} Dishes · {(activeRestaurant?.tables || []).length} Tables
             </div>
           </div>
 
@@ -1035,7 +1040,7 @@ export const RestaurantDashboard: React.FC = () => {
                 <QrCode className="w-4 h-4 shrink-0" />
                 <span>Table QR Codes</span>
               </div>
-              <span className="text-[10px] font-mono opacity-80">({activeRestaurant.tables.length})</span>
+              <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
             </button>
 
             <button
@@ -1302,8 +1307,8 @@ export const RestaurantDashboard: React.FC = () => {
                                     <Square className="w-4 h-4 text-neutral-300 shrink-0 mt-0.5" />
                                   )}
                                   <div className={isChecked ? 'line-through text-neutral-400' : ''}>
-                                    <span className="font-mono font-bold text-amber-800 mr-1.5">{ci.quantity}x</span>
-                                    <span className="font-bold">{ci.foodItem.name}</span>
+                                    <span className="font-mono font-bold text-amber-800 mr-1.5">{ci.quantity || 1}x</span>
+                                    <span className="font-bold">{ci.foodItem?.name || (ci as any).name || (ci as any).title || 'Item'}</span>
                                     {ci.notes && (
                                       <div className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded mt-0.5 italic no-underline">
                                         Note: {ci.notes}
@@ -1312,7 +1317,7 @@ export const RestaurantDashboard: React.FC = () => {
                                   </div>
                                 </div>
                                 <span className={`font-mono font-semibold shrink-0 ${isChecked ? 'line-through text-neutral-400' : 'text-neutral-500'}`}>
-                                  {design.currencySymbol}{(ci.foodItem.price * ci.quantity).toLocaleString()}
+                                  {design.currencySymbol}{((ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1)).toLocaleString()}
                                 </span>
                               </div>
                             );
@@ -2444,7 +2449,7 @@ export const RestaurantDashboard: React.FC = () => {
                     <QrCode className="w-4 h-4 shrink-0" />
                     <span>Table QR Codes</span>
                   </div>
-                  <span className="text-[10px] font-mono opacity-80">({activeRestaurant.tables.length})</span>
+                  <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
                 </button>
 
                 <button
@@ -2523,7 +2528,7 @@ export const RestaurantDashboard: React.FC = () => {
         activeOrdersCount={activeOrders.length}
         waiterCallsCount={restaurantCalls.length}
         totalDishesCount={allDishes.length}
-        totalTablesCount={activeRestaurant.tables.length}
+        totalTablesCount={(activeRestaurant?.tables || []).length}
         isTestingChime={testingChime}
         onTestChime={handleTestChime}
       />

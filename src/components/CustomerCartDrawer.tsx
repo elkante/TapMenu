@@ -43,7 +43,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
   const hasTakeout = cart.some(ci => ci.itemType === 'takeaway');
   const orderType  = hasDineIn && hasTakeout ? 'both' : hasTakeout ? 'takeaway' : 'dine_in';
 
-  const subtotal      = cart.reduce((sum, ci) => sum + ci.foodItem.price * ci.quantity, 0);
+  const subtotal      = cart.reduce((sum, ci) => sum + (ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1), 0);
   const takeoutCount  = cart.filter(ci => ci.itemType === 'takeaway').reduce((s, ci) => s + ci.quantity, 0);
   // Auto-set pack count to match takeout item count (user can adjust)
   const effectivePacks = Math.max(packCount, 1);
@@ -112,7 +112,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
             </div>
             <h3 className="text-lg font-bold text-neutral-900">Order Placed!</h3>
             <p className="text-xs text-neutral-500 mt-1 mb-4">
-              Ticket <span className="font-mono font-bold text-neutral-800">#{orderPlacedSuccess}</span> sent to {activeRestaurant.name}'s kitchen.
+              Ticket <span className="font-mono font-bold text-neutral-800">#{orderPlacedSuccess}</span> sent to {activeRestaurant?.name || 'the'}'s kitchen.
             </p>
             <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 w-full text-xs text-neutral-600 mb-6 font-mono space-y-1 text-left">
               <div>Table: {currentTable || 'Table 01'}</div>
@@ -167,7 +167,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                       {/* Item name + remove */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <span className="font-bold text-neutral-900 block truncate">{ci.foodItem.name}</span>
+                          <span className="font-bold text-neutral-900 block truncate">{ci.foodItem?.name || (ci as any).name || (ci as any).title || 'Item'}</span>
                           {ci.notes && (
                             <div className="text-[11px] text-neutral-500 mt-0.5 italic">Note: {ci.notes}</div>
                           )}
@@ -233,7 +233,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
 
                         {/* Line price */}
                         <span className="font-mono font-bold text-neutral-800 text-xs">
-                          {design.currencySymbol}{(ci.foodItem.price * ci.quantity).toLocaleString()}
+                          {design.currencySymbol}{((ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1)).toLocaleString()}
                         </span>
                       </div>
 
@@ -356,7 +356,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                     ))}
                   </div>
                   <p className="text-[10px] text-neutral-400 text-center">
-                    🔒 TapMenu never holds your money. Payments go directly to {activeRestaurant.name}.
+                    🔒 TapMenu never holds your money. Payments go directly to {activeRestaurant?.name || 'the restaurant'}.
                   </p>
                 </div>
 

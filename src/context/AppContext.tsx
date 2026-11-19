@@ -186,7 +186,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_ORDERS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map((o: any) => ({
+            ...o,
+            items: (Array.isArray(o.items) ? o.items : []).map((ci: any) => {
+              if (!ci) return { foodItem: { id: 'item', name: 'Item', price: 0 }, quantity: 1 };
+              if (ci.foodItem) {
+                return {
+                  ...ci,
+                  foodItem: {
+                    ...ci.foodItem,
+                    name: ci.foodItem.name || ci.name || 'Item',
+                    price: Number(ci.foodItem.price ?? ci.price ?? 0)
+                  },
+                  quantity: Number(ci.quantity) || 1
+                };
+              }
+              return {
+                ...ci,
+                foodItem: {
+                  id: ci.id || 'item',
+                  name: ci.name || ci.title || 'Item',
+                  price: Number(ci.price || 0)
+                },
+                quantity: Number(ci.quantity) || 1
+              };
+            })
+          }));
+        }
+      }
     } catch {}
     return [];
   });
@@ -437,7 +467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (prev.some(o => o.id === order.id)) return prev;
               triggerKitchenAlert({
                 title: `🍽️ New Order (Table ${order.tableNumber})`,
-                body: order.items.map((i: any) => `${i.quantity}x ${i.name}`).join(', '),
+                body: (order.items || []).map((i: any) => `${i?.quantity || 1}x ${i?.foodItem?.name || i?.name || 'Item'}`).join(', '),
                 type: 'order',
                 tableNumber: order.tableNumber,
               });
@@ -567,7 +597,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   tableNumber: row.table_number,
                   customerName: row.customer_name || 'Guest Diner',
                   customerPhone: row.customer_phone || undefined,
-                  items: row.items || [],
+                  items: (Array.isArray(row.items) ? row.items : []).map((ci: any) => {
+                    if (!ci) return { foodItem: { id: 'item', name: 'Item', price: 0 }, quantity: 1 };
+                    if (ci.foodItem) {
+                      return {
+                        ...ci,
+                        foodItem: {
+                          ...ci.foodItem,
+                          name: ci.foodItem.name || ci.name || 'Item',
+                          price: Number(ci.foodItem.price ?? ci.price ?? 0)
+                        },
+                        quantity: Number(ci.quantity) || 1
+                      };
+                    }
+                    return {
+                      ...ci,
+                      foodItem: {
+                        id: ci.id || 'item',
+                        name: ci.name || ci.title || 'Item',
+                        price: Number(ci.price || 0)
+                      },
+                      quantity: Number(ci.quantity) || 1
+                    };
+                  }),
                   subtotal: row.subtotal ? Number(row.subtotal) : undefined,
                   vat: row.vat ? Number(row.vat) : undefined,
                   total: Number(row.total) || 0,
@@ -585,7 +637,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   if (prev.some(o => o.id === mapped.id)) return prev;
                   triggerKitchenAlert({
                     title: `🍽️ New Order (Table ${mapped.tableNumber})`,
-                    body: mapped.items.map((i: any) => `${i.quantity}x ${i.name}`).join(', '),
+                    body: (mapped.items || []).map((i: any) => `${i?.quantity || 1}x ${i?.foodItem?.name || i?.name || 'Item'}`).join(', '),
                     type: 'order',
                     tableNumber: mapped.tableNumber,
                   });

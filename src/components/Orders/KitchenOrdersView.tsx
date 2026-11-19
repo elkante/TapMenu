@@ -257,7 +257,7 @@ export const KitchenOrdersView: React.FC = () => {
                         <div>
                           <div className="font-semibold text-neutral-800">
                             <span className="font-mono font-bold text-amber-800 mr-1.5">{ci.quantity}x</span>
-                            <span>{ci.foodItem.name}</span>
+                            <span>{ci.foodItem?.name || (ci as any).name || 'Item'}</span>
                           </div>
                           {ci.notes && (
                             <div className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded mt-0.5 italic">
@@ -266,7 +266,7 @@ export const KitchenOrdersView: React.FC = () => {
                           )}
                         </div>
                         <span className="font-mono text-neutral-500 font-medium">
-                          {activeRestaurant.design.currencySymbol}{(ci.foodItem.price * ci.quantity).toLocaleString()}
+                          {activeRestaurant?.design?.currencySymbol || '₦'}{((ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1)).toLocaleString()}
                         </span>
                       </div>
                     ))}

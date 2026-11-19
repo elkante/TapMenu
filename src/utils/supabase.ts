@@ -795,13 +795,38 @@ export async function fetchOrdersFromSupabase(restaurantId: string, slug?: strin
           : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const safeTs = !isNaN(d.getTime()) ? d.getTime() : Date.now();
 
+        const rawItems = Array.isArray(row.items) ? row.items : [];
+        const normalizedItems = rawItems.map((ci: any) => {
+          if (!ci) return { foodItem: { id: 'item', name: 'Item', price: 0 }, quantity: 1 };
+          if (ci.foodItem) {
+            return {
+              ...ci,
+              foodItem: {
+                ...ci.foodItem,
+                name: ci.foodItem.name || ci.name || 'Item',
+                price: Number(ci.foodItem.price ?? ci.price ?? 0)
+              },
+              quantity: Number(ci.quantity) || 1
+            };
+          }
+          return {
+            ...ci,
+            foodItem: {
+              id: ci.id || 'item',
+              name: ci.name || ci.title || 'Item',
+              price: Number(ci.price || 0)
+            },
+            quantity: Number(ci.quantity) || 1
+          };
+        });
+
         return {
           id: row.id,
           restaurantId: row.restaurant_id,
           tableNumber: row.table_number,
           customerName: row.customer_name || 'Guest Diner',
           customerPhone: row.customer_phone || undefined,
-          items: row.items || [],
+          items: normalizedItems,
           subtotal: row.subtotal ? Number(row.subtotal) : undefined,
           vat: row.vat ? Number(row.vat) : undefined,
           total: Number(row.total) || 0,

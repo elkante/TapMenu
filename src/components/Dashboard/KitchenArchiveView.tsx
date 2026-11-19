@@ -334,7 +334,7 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
                     </div>
 
                     <div className="text-neutral-600 font-medium">
-                      {order.customerName} {order.customerPhone ? `(${order.customerPhone})` : ''} · {order.items.map(i => `${i.quantity}x ${i.foodItem.name}`).join(', ')}
+                      {order.customerName} {order.customerPhone ? `(${order.customerPhone})` : ''} · {(Array.isArray(order.items) ? order.items : []).map((i: any) => `${i.quantity || 1}x ${i.foodItem?.name || i.name || 'Item'}`).join(', ')}
                     </div>
                   </div>
 

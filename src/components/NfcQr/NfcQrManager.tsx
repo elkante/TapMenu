@@ -132,7 +132,7 @@ export const NfcQrManager: React.FC = () => {
           </button>
           <div>
             <h1 className="text-sm font-bold text-neutral-900">QR & Digital Table Cards</h1>
-            <p className="text-[11px] text-neutral-500">{activeRestaurant.name} · {activeRestaurant.tables.length} Tables</p>
+            <p className="text-[11px] text-neutral-500">{activeRestaurant?.name || 'Restaurant'} · {(activeRestaurant?.tables || []).length} Tables</p>
           </div>
         </div>
 
