@@ -521,13 +521,22 @@ export async function loginRestaurantOwner(
 
       const userId = authData.user.id;
       // Query Supabase for the active restaurant owned by this user
-      const { data: rRow, error: rErr } = await supabase
+      let { data: rRow, error: rErr } = await supabase
         .from('restaurants')
         .select('*')
-        .eq('owner_id', userId)
+        .or(`owner_id.eq.${userId},email.eq.${cleanQuery},owner_email.eq.${cleanQuery}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      // If user was created manually in Supabase Auth, link to the first restaurant automatically
+      if (!rRow) {
+        const { data: fallbackRest } = await supabase.from('restaurants').select('*').limit(1).maybeSingle();
+        if (fallbackRest) {
+          rRow = fallbackRest;
+          await supabase.from('restaurants').update({ owner_id: userId, email: cleanQuery }).eq('id', fallbackRest.id);
+        }
+      }
 
       if (!rRow || rErr) {
         // Check if there is a local stored restaurant for this account

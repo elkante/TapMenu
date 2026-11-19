@@ -83,7 +83,7 @@ export const SuperAdminView: React.FC = () => {
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
   const [authMode, setAuthMode] = useState<'passcode' | 'supabase'>('supabase');
   const [pinInput, setPinInput] = useState('');
-  const [adminEmail, setAdminEmail] = useState('admin@tm.tap');
+  const [adminEmail, setAdminEmail] = useState('admin@tm.com');
   const [adminPassword, setAdminPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
