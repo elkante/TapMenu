@@ -761,7 +761,12 @@ export async function syncWaiterCallToSupabase(call: WaiterCall): Promise<boolea
 export async function fetchOrdersFromSupabase(restaurantId: string, slug?: string): Promise<Order[]> {
   if (!supabase || !restaurantId) return [];
   try {
-    let query = supabase.from('orders').select('*');
+    // Only fetch today's orders — drastically cuts egress vs fetching all-time history
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayISO = todayStart.toISOString();
+
+    let query = supabase.from('orders').select('*').gte('created_at', todayISO);
     if (slug && slug !== restaurantId) {
       query = query.or(`restaurant_id.eq.${restaurantId},restaurant_id.eq.${slug}`);
     } else {

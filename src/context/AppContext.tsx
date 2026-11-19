@@ -646,13 +646,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const matchesRest = row.restaurant_id === targetRestId || (targetSlug && row.restaurant_id === targetSlug);
               if (!matchesRest) return;
 
-              const slugToFetch = targetSlug || activeRestaurant.slug;
-              if (slugToFetch) {
-                fetchRestaurantBySlug(slugToFetch).then(remote => {
-                  if (remote && isMounted) {
-                    setRestaurants(prev => [remote, ...prev.filter(r => r.id !== remote.id && r.slug !== remote.slug)]);
-                  }
-                });
+              // Use the payload directly — no re-fetch of the entire restaurant
+              if (payload.eventType === 'INSERT' && payload.new) {
+                const item = payload.new;
+                setRestaurants(prev => prev.map(r => {
+                  if (r.id !== targetRestId && r.slug !== targetSlug) return r;
+                  const page = r.pages.find(p => p.title === item.category) || r.pages[0];
+                  if (!page) return r;
+                  const alreadyExists = page.items.some((i: any) => i.id === item.id);
+                  if (alreadyExists) return r;
+                  return {
+                    ...r,
+                    pages: r.pages.map(p => p.title === page.title
+                      ? { ...p, items: [...p.items, { id: item.id, name: item.name, price: item.price, description: item.description, emoji: item.emoji, image: item.image, soldOut: item.sold_out }] }
+                      : p
+                    )
+                  };
+                }));
+              } else if (payload.eventType === 'UPDATE' && payload.new) {
+                const item = payload.new;
+                setRestaurants(prev => prev.map(r => {
+                  if (r.id !== targetRestId && r.slug !== targetSlug) return r;
+                  return {
+                    ...r,
+                    pages: r.pages.map(p => ({
+                      ...p,
+                      items: p.items.map((i: any) => i.id === item.id
+                        ? { ...i, name: item.name, price: item.price, description: item.description, emoji: item.emoji, image: item.image, soldOut: item.sold_out }
+                        : i
+                      )
+                    }))
+                  };
+                }));
+              } else if (payload.eventType === 'DELETE' && payload.old) {
+                const deletedId = payload.old.id;
+                setRestaurants(prev => prev.map(r => {
+                  if (r.id !== targetRestId && r.slug !== targetSlug) return r;
+                  return {
+                    ...r,
+                    pages: r.pages.map(p => ({
+                      ...p,
+                      items: p.items.filter((i: any) => i.id !== deletedId)
+                    }))
+                  };
+                }));
               }
             }
           )
@@ -662,33 +699,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // 4. Reliable Polling Loop (every 2.5 seconds)
-    const pollSupabase = async () => {
+    // 4. One-time initial fetch on mount (Realtime handles all subsequent updates)
+    const initialFetch = async () => {
       try {
         const queryId = targetRestId || targetSlug;
         const [remoteOrders, remoteCalls] = await Promise.all([
           fetchOrdersFromSupabase(queryId, targetSlug),
           fetchWaiterCallsFromSupabase(queryId, targetSlug)
         ]);
-
         if (!isMounted) return;
-
         if (Array.isArray(remoteOrders)) {
           setOrders(prev => {
             const prevMap = new Map(prev.map(o => [o.id, o]));
-            const newOrders = remoteOrders.filter(ro => !prevMap.has(ro.id));
-
-            if (newOrders.length > 0 && !isCustomerRoute) {
-              const latest = newOrders[0];
-              triggerKitchenAlert({
-                title: `🍽️ New Order (Table ${latest.tableNumber})`,
-                body: latest.items.map((i: any) => `${i.quantity}x ${i.name}`).join(', '),
-                type: 'order',
-                tableNumber: latest.tableNumber,
-              });
-            }
-
-            // Merge: remote orders are authoritative, but preserve optimistic local fields (like paymentMethod if missing in remote)
             const mergedMap = new Map<string, Order>();
             remoteOrders.forEach(o => {
               const local = prevMap.get(o.id);
@@ -700,40 +722,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 packCount: o.packCount ?? local?.packCount,
               });
             });
-            prev.forEach(o => {
-              if (!mergedMap.has(o.id)) {
-                mergedMap.set(o.id, o);
-              }
-            });
+            prev.forEach(o => { if (!mergedMap.has(o.id)) mergedMap.set(o.id, o); });
             return Array.from(mergedMap.values());
           });
         }
-
-        if (Array.isArray(remoteCalls)) {
-          setWaiterCalls(prev => {
-            const prevIds = new Set(prev.map(c => c.id));
-            const newCalls = remoteCalls.filter(c => !prevIds.has(c.id));
-            if (newCalls.length > 0 && !isCustomerRoute) {
-              const latest = newCalls[0];
-              triggerKitchenAlert({
-                title: `🛎️ Table ${latest.tableNumber} Calling Waiter!`,
-                body: `Table ${latest.tableNumber} requested assistance (${latest.reason || 'Service'}).`,
-                type: 'waiter',
-                tableNumber: latest.tableNumber,
-              });
-            }
-            return remoteCalls;
-          });
-        }
+        if (Array.isArray(remoteCalls)) setWaiterCalls(remoteCalls);
       } catch {}
     };
 
-    pollSupabase();
-    const interval = setInterval(pollSupabase, 2500);
+    initialFetch();
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
       try { broadcast?.close(); } catch {}
       try { if (supabaseChannel) supabase.removeChannel(supabaseChannel); } catch {}
