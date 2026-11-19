@@ -46,6 +46,7 @@ import { playKitchenChime } from '../../utils/audio';
 import { KitchenInventoryView } from './KitchenInventoryView';
 import { KitchenExpenseView } from './KitchenExpenseView';
 import { KitchenArchiveView } from './KitchenArchiveView';
+import { KitchenDisplay } from './KitchenDisplay';
 import { OrderSmartCardsModal } from '../Hardware/OrderSmartCardsModal';
 import { MultiStoreManagerModal } from './MultiStoreManagerModal';
 import { getNetworkVerifiedDate, formatNetworkDate, formatNetworkTime } from '../../utils/networkTime';
@@ -731,6 +732,123 @@ export const RestaurantDashboard: React.FC = () => {
       setIsSyncingDishes(false);
     }
   };
+
+  const renderEndDayModal = () => {
+    if (!isEndDayModalOpen) return null;
+    return (
+      <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+        <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-neutral-200 text-xs animate-in zoom-in-95 duration-200">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-500 text-neutral-950 flex items-center justify-center font-bold">
+                <Receipt className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-extrabold text-neutral-900">End Day Shift · Z-Report</h3>
+                <p className="text-[11px] text-neutral-500">{activeRestaurant.name} · Cumulative Reconciliation</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsEndDayModalOpen(false)}
+              className="text-neutral-400 hover:text-neutral-800 p-1 rounded-lg"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Shift Summary Cards */}
+          <div className="my-4 space-y-3">
+            <div className="p-3 bg-neutral-900 text-white rounded-2xl flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Total Accumulated Sales Today</span>
+                <span className="font-mono text-2xl font-black text-amber-400">{design.currencySymbol}{totalDayRevenue.toLocaleString()}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-neutral-400 block">Shift Duration</span>
+                <span className="font-mono text-xs text-neutral-200">{dayStartTime} — {liveClock}</span>
+              </div>
+            </div>
+
+            {/* Breakdown Grid */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl">
+                <span className="text-[10px] text-neutral-400 font-bold block uppercase">Total Diners</span>
+                <span className="font-mono text-base font-black text-neutral-900">{totalDinersCount}</span>
+              </div>
+              <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl">
+                <span className="text-[10px] text-neutral-400 font-bold block uppercase">Orders Served</span>
+                <span className="font-mono text-base font-black text-emerald-700">{servedOrdersCount} / {restaurantOrders.length}</span>
+              </div>
+              <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl">
+                <span className="text-[10px] text-neutral-400 font-bold block uppercase">VAT Collected</span>
+                <span className="font-mono text-base font-black text-amber-800">{design.currencySymbol}{totalDayVat.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Payment Methods Breakdown */}
+            <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-2">
+              <span className="text-[11px] font-bold text-neutral-800 block">Settlement Breakdown</span>
+              <div className="flex items-center justify-between text-xs text-neutral-600">
+                <span className="flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5 text-blue-600" /> POS / Card at Table:</span>
+                <span className="font-mono font-bold text-neutral-900">{design.currencySymbol}{paymentBreakdown.pos.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-neutral-600">
+                <span className="flex items-center gap-1.5"><Coins className="w-3.5 h-3.5 text-amber-600" /> Cash to Waiters:</span>
+                <span className="font-mono font-bold text-neutral-900">{design.currencySymbol}{paymentBreakdown.cash.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-neutral-600">
+                <span className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 text-emerald-600" /> Direct Bank Transfer:</span>
+                <span className="font-mono font-bold text-neutral-900">{design.currencySymbol}{paymentBreakdown.transfer.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-3 border-t border-neutral-100">
+            <button
+              type="button"
+              onClick={handleConfirmEndDay}
+              className="w-full sm:w-auto px-6 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+            >
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Close Day & Archive</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Full-Screen Redesigned Dark Kitchen Display System (KDS Mode)
+  if (activeTab === 'kds') {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex flex-col font-sans select-none">
+        <KitchenDisplay
+          onSwitchToManager={() => setActiveTab('menu')}
+          shiftData={shiftData}
+          onStartDay={handleStartDay}
+          onEndDay={() => setIsEndDayModalOpen(true)}
+          handlePrintTicket={handlePrintTicket}
+        />
+
+        {/* Floating Notched Bottom Navigation for Mobile */}
+        <NotchedBottomBar
+          variant="kitchen_dashboard"
+          activeTab={activeTab}
+          onTabChange={(tab) => setActiveTab(tab)}
+          activeOrdersCount={activeOrders.length}
+          waiterCallsCount={restaurantCalls.length}
+          totalDishesCount={allDishes.length}
+          totalTablesCount={activeRestaurant.tables.length}
+          isTestingChime={testingChime}
+          onTestChime={handleTestChime}
+        />
+
+        {renderEndDayModal()}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col font-sans">
@@ -2186,89 +2304,7 @@ export const RestaurantDashboard: React.FC = () => {
       {/* ========================================================= */}
       {/* MODAL: END DAY SHIFT RECONCILIATION & Z-REPORT */}
       {/* ========================================================= */}
-      {isEndDayModalOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-neutral-200 text-xs animate-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500 text-neutral-950 flex items-center justify-center font-bold">
-                  <Receipt className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-extrabold text-neutral-900">End Day Shift · Z-Report</h3>
-                  <p className="text-[11px] text-neutral-500">{activeRestaurant.name} · Cumulative Reconciliation</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsEndDayModalOpen(false)}
-                className="text-neutral-400 hover:text-neutral-800 p-1 rounded-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Shift Summary Cards */}
-            <div className="my-4 space-y-3">
-              <div className="p-3 bg-neutral-900 text-white rounded-2xl flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Total Accumulated Sales Today</span>
-                  <span className="font-mono text-2xl font-black text-amber-400">{design.currencySymbol}{totalDayRevenue.toLocaleString()}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-neutral-400 block">Shift Duration</span>
-                  <span className="font-mono text-xs text-neutral-200">{dayStartTime} — {liveClock}</span>
-                </div>
-              </div>
-
-              {/* Breakdown Grid */}
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl">
-                  <span className="text-[10px] text-neutral-400 font-bold block uppercase">Total Diners</span>
-                  <span className="font-mono text-base font-black text-neutral-900">{totalDinersCount}</span>
-                </div>
-                <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl">
-                  <span className="text-[10px] text-neutral-400 font-bold block uppercase">Orders Served</span>
-                  <span className="font-mono text-base font-black text-emerald-700">{servedOrdersCount} / {restaurantOrders.length}</span>
-                </div>
-                <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl">
-                  <span className="text-[10px] text-neutral-400 font-bold block uppercase">VAT Collected</span>
-                  <span className="font-mono text-base font-black text-amber-800">{design.currencySymbol}{totalDayVat.toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* Payment Methods Breakdown */}
-              <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-2">
-                <span className="text-[11px] font-bold text-neutral-800 block">Settlement Breakdown</span>
-                <div className="flex items-center justify-between text-xs text-neutral-600">
-                  <span className="flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5 text-blue-600" /> POS / Card at Table:</span>
-                  <span className="font-mono font-bold text-neutral-900">{design.currencySymbol}{paymentBreakdown.pos.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-neutral-600">
-                  <span className="flex items-center gap-1.5"><Coins className="w-3.5 h-3.5 text-amber-600" /> Cash to Waiters:</span>
-                  <span className="font-mono font-bold text-neutral-900">{design.currencySymbol}{paymentBreakdown.cash.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-neutral-600">
-                  <span className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 text-emerald-600" /> Direct Bank Transfer:</span>
-                  <span className="font-mono font-bold text-neutral-900">{design.currencySymbol}{paymentBreakdown.transfer.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-3 border-t border-neutral-100">
-              <button
-                type="button"
-                onClick={handleConfirmEndDay}
-                className="w-full sm:w-auto px-6 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
-              >
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Close Day & Archive</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderEndDayModal()}
 
       {/* Order Smart Cards Hardware Modal */}
       <OrderSmartCardsModal
