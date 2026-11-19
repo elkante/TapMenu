@@ -1,8 +1,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { RestaurantTenant, FoodItem, Order, WaiterCall, MenuBookPage } from '../types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ikkljurxmfwmhhumoiqo.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_vSVJBftn3OHtozdV6GKMjA_KHIlJEo8';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kxszokrflzknhtsicbzm.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_uHLP5_-WK_mZH-fHd_e3AQ_6XhkviZJ';
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
