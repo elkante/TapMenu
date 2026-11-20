@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, Filter, DollarSign, Printer, ChevronRight, TrendingUp, TrendingDown, ShoppingBag, CreditCard, Banknote, Building2, Clock, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Calendar, Filter, DollarSign, Printer, ChevronRight, TrendingUp, TrendingDown, ShoppingBag, CreditCard, Banknote, Building2, Clock, CheckCircle2, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
 import { Order, RestaurantTenant } from '../../types';
 import { ExpenseItem } from '../../types';
 import { getStoredExpenses, fetchExpensesFromSupabase } from '../../utils/expenseStorage';
@@ -84,6 +84,45 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
   const totalVat = filteredOrders.reduce((sum, o) => sum + (o.vat || 0), 0);
 
   const timeframeLabel = filterMode === 'day' ? selectedDate : filterMode === 'month' ? selectedMonth : selectedYear;
+
+  const handleExportCsv = () => {
+    if (filteredOrders.length === 0) return;
+    const headers = ['Order ID', 'Date', 'Time', 'Table / Destination', 'Customer Name', 'Phone', 'Items', 'Order Type', 'Payment Method', 'Subtotal', 'VAT', 'Packaging Fee', 'Delivery Fee', 'Total', 'Status'];
+    const rows = filteredOrders.map(o => {
+      const itemsStr = (o.items || []).map(ci => `${ci.quantity || 1}x ${ci.foodItem?.name || (ci as any).name || 'Item'}`).join('; ');
+      return [
+        o.id,
+        o.createdAtTimestamp ? new Date(o.createdAtTimestamp).toLocaleDateString() : 'Today',
+        o.createdAt || '',
+        `"${(o.tableNumber || '').replace(/"/g, '""')}"`,
+        `"${(o.customerName || '').replace(/"/g, '""')}"`,
+        `"${(o.customerPhone || '').replace(/"/g, '""')}"`,
+        `"${itemsStr.replace(/"/g, '""')}"`,
+        o.orderType || 'dine_in',
+        o.paymentMethod || 'pos',
+        o.subtotal || 0,
+        o.vat || 0,
+        o.packagingFee || 0,
+        o.deliveryFee || 0,
+        o.total || 0,
+        o.status || 'pending'
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `tapmenu_ledger_${restaurant.slug}_${timeframeLabel}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrintReport = () => {
+    window.print();
+  };
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
@@ -189,6 +228,27 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
             title="Refresh Cloud Archive"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-amber-500' : ''}`} />
+          </button>
+
+          {/* Export CSV Button */}
+          <button
+            onClick={handleExportCsv}
+            disabled={filteredOrders.length === 0}
+            className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+            title="Export filtered orders as CSV file"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Export CSV</span>
+          </button>
+
+          {/* Print / PDF Report Button */}
+          <button
+            onClick={handlePrintReport}
+            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+            title="Print or save as PDF report"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print / PDF</span>
           </button>
         </div>
       </div>

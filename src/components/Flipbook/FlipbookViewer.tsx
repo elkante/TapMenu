@@ -43,10 +43,12 @@ export const FlipbookViewer: React.FC = () => {
   // Touch swipe handling for mobile
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const touchIsScrolling = useRef<boolean>(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    // If user touched an interactive button, input or link, do NOT start a swipe gesture
-    if ((e.target as HTMLElement).closest('button, input, select, textarea, a, [role="button"]')) {
+    touchIsScrolling.current = false;
+    // If user touched an interactive button, input, link, or add-to-cart element
+    if ((e.target as HTMLElement).closest('button, input, select, textarea, a, [role="button"], [data-action]')) {
       touchStartX.current = null;
       touchStartY.current = null;
       return;
@@ -55,12 +57,28 @@ export const FlipbookViewer: React.FC = () => {
     touchStartY.current = e.touches[0].clientY;
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
+  const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartX.current === null || touchStartY.current === null) return;
+    const dy = Math.abs(e.touches[0].clientY - touchStartY.current);
+    const dx = Math.abs(e.touches[0].clientX - touchStartX.current);
+    // If vertical movement exceeds horizontal movement, user is scrolling the dishes list!
+    if (dy > 12 && dy > dx) {
+      touchIsScrolling.current = true;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null || touchIsScrolling.current) {
+      touchStartX.current = null;
+      touchStartY.current = null;
+      touchIsScrolling.current = false;
+      return;
+    }
     const deltaX = e.changedTouches[0].clientX - touchStartX.current;
     const deltaY = e.changedTouches[0].clientY - touchStartY.current;
 
-    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+    // Strict horizontal swipe check: horizontal delta must be > 55px and at least 2x any vertical movement
+    if (Math.abs(deltaX) > 55 && Math.abs(deltaX) > Math.abs(deltaY) * 2.0) {
       if (deltaX < 0) {
         goToNextPage();
       } else {
@@ -69,6 +87,7 @@ export const FlipbookViewer: React.FC = () => {
     }
     touchStartX.current = null;
     touchStartY.current = null;
+    touchIsScrolling.current = false;
   };
 
   // Keyboard navigation
@@ -185,6 +204,7 @@ export const FlipbookViewer: React.FC = () => {
       <div 
         className="flex-1 flex items-center justify-center my-auto w-full relative py-1"
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         {/* Navigation Arrow Left (Desktop) */}

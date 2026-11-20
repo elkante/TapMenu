@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { 
   RestaurantTenant, 
   MenuBookDesign, 
@@ -153,7 +153,7 @@ const EMPTY_RESTAURANT: RestaurantTenant = {
     showPageNumbers: true,
     enableAudioEffect: true,
     showPriceSymbols: true,
-    currencySymbol: 'â‚¦',
+    currencySymbol: '₦',
   },
   tables: [],
   pages: []
@@ -185,44 +185,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isNfcSource, setIsNfcSource] = useState<boolean>(false);
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  // Real Orders (NO mock fake data)
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_ORDERS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.map((o: any) => ({
-            ...o,
-            items: (Array.isArray(o.items) ? o.items : []).map((ci: any) => {
-              if (!ci) return { foodItem: { id: 'item', name: 'Item', price: 0 }, quantity: 1 };
-              if (ci.foodItem) {
-                return {
-                  ...ci,
-                  foodItem: {
-                    ...ci.foodItem,
-                    name: ci.foodItem.name || ci.name || 'Item',
-                    price: Number(ci.foodItem.price ?? ci.price ?? 0)
-                  },
-                  quantity: Number(ci.quantity) || 1
-                };
-              }
-              return {
-                ...ci,
-                foodItem: {
-                  id: ci.id || 'item',
-                  name: ci.name || ci.title || 'Item',
-                  price: Number(ci.price || 0)
-                },
-                quantity: Number(ci.quantity) || 1
-              };
-            })
-          }));
-        }
-      }
-    } catch {}
-    return [];
-  });
+  // Real Orders (Pure live DB data, zero cross-tenant contamination)
+  const [orders, setOrders] = useState<Order[]>([]);
 
   const [waiterCalls, setWaiterCalls] = useState<WaiterCall[]>(() => {
     try {
@@ -737,7 +701,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const matchesRest = row.restaurant_id === targetRestId || (targetSlug && row.restaurant_id === targetSlug);
               if (!matchesRest) return;
 
-              // Use the payload directly â€” no re-fetch of the entire restaurant
+              // Use the payload directly — no re-fetch of the entire restaurant
               if (payload.eventType === 'INSERT' && payload.new) {
                 const item = payload.new;
                 setRestaurants(prev => prev.map(r => {
@@ -801,20 +765,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!isMounted) return;
         if (Array.isArray(remoteOrders)) {
           setOrders(prev => {
+            // Keep local status updates if more recent, but strictly limit to remote orders for this restaurant!
             const prevMap = new Map(prev.map(o => [o.id, o]));
-            const mergedMap = new Map<string, Order>();
-            remoteOrders.forEach(o => {
+            return remoteOrders.map(o => {
               const local = prevMap.get(o.id);
-              mergedMap.set(o.id, {
+              return {
                 ...o,
-                paymentMethod: o.paymentMethod || local?.paymentMethod || undefined,
+                status: local?.status || o.status,
+                paymentMethod: o.paymentMethod || local?.paymentMethod || 'pos',
                 orderType: o.orderType || local?.orderType || 'dine_in',
                 packagingFee: o.packagingFee ?? local?.packagingFee,
                 packCount: o.packCount ?? local?.packCount,
-              });
+              };
             });
-            prev.forEach(o => { if (!mergedMap.has(o.id)) mergedMap.set(o.id, o); });
-            return Array.from(mergedMap.values());
           });
         }
         if (Array.isArray(remoteCalls)) setWaiterCalls(remoteCalls);
@@ -823,8 +786,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     initialFetch();
 
+    // 5. Lightweight KDS / Kitchen heartbeat: checks every 3.5s for fresh incoming orders
+    // Guarantees instant chime & delivery even when mobile browser websockets drop or sleep
+    let heartbeatTimer: any = null;
+    const isStaffKds = !isCustomerRoute || currentView === 'orders' || currentView === 'dashboard';
+    if (isStaffKds) {
+      heartbeatTimer = setInterval(async () => {
+        if (!isMounted) return;
+        try {
+          const queryId = targetRestId || targetSlug;
+          const freshOrders = await fetchOrdersFromSupabase(queryId, targetSlug);
+          if (Array.isArray(freshOrders) && isMounted) {
+            setOrders(prev => {
+              const prevIds = new Set(prev.map(o => o.id));
+              const newlyArrived = freshOrders.filter(fo => !prevIds.has(fo.id));
+              if (newlyArrived.length > 0) {
+                newlyArrived.forEach(no => {
+                  triggerKitchenAlert({
+                    title: `🍽️ New Order (${no.tableNumber || 'Table'})`,
+                    body: (no.items || []).map((i: any) => `${i?.quantity || 1}x ${i?.foodItem?.name || i?.name || 'Item'}`).join(', '),
+                    type: 'order',
+                    tableNumber: no.tableNumber,
+                  });
+                });
+                return [...newlyArrived, ...prev];
+              }
+              return prev;
+            });
+          }
+        } catch {}
+      }, 3500);
+    }
+
     return () => {
       isMounted = false;
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
       window.removeEventListener('storage', handleStorageChange);
       try { broadcast?.close(); } catch {}
       try { if (supabaseChannel) supabase.removeChannel(supabaseChannel); } catch {}
@@ -1204,7 +1200,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (target) {
       const maxTables = getTenantMaxTables(target);
       if (maxTables !== null && target.tables.length >= maxTables) {
-        showNotification(`ðŸš« Table limit reached (${maxTables} max). Upgrade your plan or contact admin.`);
+        showNotification(`🚫 Table limit reached (${maxTables} max). Upgrade your plan or contact admin.`);
         return;
       }
     }
@@ -1288,7 +1284,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const existing = r.tables.length;
 
         if (maxTables !== null && existing >= maxTables) {
-          showNotification(`ðŸš« Table limit reached (${maxTables} max). Upgrade your plan or contact admin.`);
+          showNotification(`🚫 Table limit reached (${maxTables} max). Upgrade your plan or contact admin.`);
           return r;
         }
 
@@ -1349,7 +1345,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentTable(tableNumber);
     setIsNfcSource(true);
     setCurrentView('flipbook');
-    showNotification(`âš¡ Smart Card tapped for ${tableNumber}`);
+    showNotification(`⚡ Smart Card tapped for ${tableNumber}`);
   };
 
   // Cart & Ordering
@@ -1412,6 +1408,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       packagingFee?: number;
       packCount?: number;
       deliveryAddress?: string;
+      paymentProofUrl?: string;
     }
   ): Order | null => {
     if (cart.length === 0) return null;
@@ -1426,11 +1423,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Format table number / destination
     let orderTable = currentTable || 'Table 1';
     if (orderType === 'delivery') {
-      orderTable = 'ðŸ›µ Delivery';
+      orderTable = '🛵 Delivery';
     } else if (orderType === 'takeaway') {
-      orderTable = isCounterMode ? 'âš¡ Counter Takeaway' : `Takeout (${currentTable || 'Walk-in'})`;
+      orderTable = isCounterMode ? '⚡ Counter Takeaway' : `Takeout (${currentTable || 'Walk-in'})`;
     } else if (isCounterMode) {
-      orderTable = 'âš¡ Walk-up Counter';
+      orderTable = '⚡ Walk-up Counter';
     }
 
     let targetRestaurantId = activeRestaurant.id;
@@ -1464,7 +1461,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       orderType,
       packagingFee: packagingFee > 0 ? packagingFee : undefined,
       packCount: extraDetails?.packCount,
-      deliveryAddress: extraDetails?.deliveryAddress?.trim() || undefined
+      deliveryAddress: extraDetails?.deliveryAddress?.trim() || undefined,
+      paymentProofUrl: extraDetails?.paymentProofUrl,
+      paymentVerified: false
     };
 
     setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
@@ -1484,17 +1483,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       if (supabase && targetRestaurantId) {
         const chan = supabase.channel(`kds-sync-${targetRestaurantId}`);
-        chan.send({
-          type: 'broadcast',
-          event: 'NEW_ORDER',
-          payload: newOrder
+        chan.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            chan.send({
+              type: 'broadcast',
+              event: 'NEW_ORDER',
+              payload: newOrder
+            });
+          }
         });
         if (activeRestaurant.slug && activeRestaurant.slug !== targetRestaurantId) {
           const slugChan = supabase.channel(`kds-sync-${activeRestaurant.slug}`);
-          slugChan.send({
-            type: 'broadcast',
-            event: 'NEW_ORDER',
-            payload: newOrder
+          slugChan.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              slugChan.send({
+                type: 'broadcast',
+                event: 'NEW_ORDER',
+                payload: newOrder
+              });
+            }
           });
         }
       }
@@ -1505,7 +1512,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 3. Database persistence in background
     syncOrderToSupabase(newOrder);
 
-    showNotification(`ðŸŽ‰ Order sent to ${activeRestaurant.name || 'kitchen'} from ${orderTable}!`);
+    showNotification(`🎉 Order sent to ${activeRestaurant.name || 'kitchen'} from ${orderTable}!`);
     return newOrder;
   };
 
@@ -1554,7 +1561,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {}
 
     syncWaiterCallToSupabase(newCall);
-    showNotification(`ðŸ”” Waiter buzzed for ${tableNum}: ${reason}`);
+    showNotification(`🔔 Waiter buzzed for ${tableNum}: ${reason}`);
   };
 
   const resolveWaiterCall = (id: string) => {

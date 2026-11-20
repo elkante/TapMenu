@@ -278,7 +278,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
 
       {/* Main Content Area: Dishes list with Dot Leaders & Smooth Native Touch Scroll */}
       <div 
-        className="flex-1 overflow-y-auto space-y-2 px-0.5 pr-1.5 pb-6 overscroll-contain"
+        className="flex-1 min-h-0 overflow-y-auto space-y-2.5 px-0.5 pr-1.5 pb-12 overscroll-contain"
         style={{
           touchAction: 'pan-y',
           WebkitOverflowScrolling: 'touch',
@@ -303,7 +303,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
               {(() => {
                 const displayImage = item.imageUrl || getDishFallbackImage(item.name, page.title);
                 return (
-                  <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-stone-200 relative shadow-xs border border-stone-200/80">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-stone-200 relative shadow-xs border border-stone-200/80">
                     <img
                       src={displayImage}
                       alt={item.name}
@@ -370,6 +370,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
               {!item.isSoldOut && (
                 <button
                   type="button"
+                  data-action="add-to-cart"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (onAddToCart) {
@@ -378,13 +379,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
                       onSelectItem?.(item);
                     }
                   }}
-                  onTouchStart={(e) => {
-                    e.stopPropagation();
-                  }}
-                  onTouchEnd={(e) => {
-                    e.stopPropagation();
-                  }}
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-90 text-neutral-950 font-black shadow-xs transition-all shrink-0 cursor-pointer flex items-center justify-center border border-amber-600/30 z-20 pointer-events-auto"
+                  className="w-9 h-9 min-w-[36px] min-h-[36px] rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-90 text-neutral-950 font-black shadow-xs transition-all shrink-0 cursor-pointer flex items-center justify-center border border-amber-600/30 z-30 pointer-events-auto"
                   title="Add directly to cart"
                   aria-label={`Add ${item.name} to cart`}
                 >
@@ -396,8 +391,8 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
         )}
 
         {page.items.length > 2 && (
-          <div className="pt-2 pb-1 text-center text-[10px] text-stone-400 font-mono tracking-wide flex items-center justify-center gap-1 opacity-80 select-none">
-            <span>↓ Scroll to view all {page.items.length} dishes in {page.title}</span>
+          <div className="pt-2 pb-2 text-center text-[10px] text-amber-900 font-mono font-bold tracking-wide flex items-center justify-center gap-1 opacity-90 select-none">
+            <span>↕ Scroll to view all {page.items.length} items</span>
           </div>
         )}
       </div>

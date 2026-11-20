@@ -127,6 +127,13 @@ export interface RestaurantTenant {
   branchName?: string;
   /** Owner/admin email address (shown in Super Admin panel) */
   ownerEmail?: string;
+  /** Bank Details for Transfer Orders (Configured by owner in settings) */
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
+  /** CAC Registration Certificate (Optional upload for basic/pro verification) */
+  cacCertificateUrl?: string;
+  cacStatus?: 'none' | 'pending' | 'verified' | 'rejected';
 }
 
 export interface CartItem {
@@ -159,6 +166,9 @@ export interface Order {
   deliveryFee?: number;
   packCount?: number;
   deliveryAddress?: string;
+  /** Bank transfer payment receipt screenshot & verification */
+  paymentProofUrl?: string;
+  paymentVerified?: boolean;
 }
 
 export interface InventoryItem {

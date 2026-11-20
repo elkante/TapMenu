@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   ShoppingBag,
@@ -15,8 +15,10 @@ import {
   Package,
   Zap,
   MapPin,
-  Bike
+  Bike,
+  Upload
 } from 'lucide-react';
+import { compressImageToDataUrl } from '../utils/supabase';
 
 export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const {
@@ -29,13 +31,16 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
     placeOrder,
     activeRestaurant,
     currentTable,
-    isNfcSource
+    isNfcSource,
+    showNotification
   } = useApp();
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [packCount, setPackCount] = useState(1);
   const [paymentChoice, setPaymentChoice] = useState<'pos' | 'cash' | 'transfer'>('pos');
+  const [paymentProofUrl, setPaymentProofUrl] = useState<string>('');
+  const [hasPaidClicked, setHasPaidClicked] = useState(false);
   const [orderPlacedSuccess, setOrderPlacedSuccess] = useState<string | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   // Top-level order mode — the most visible choice the customer makes
@@ -86,6 +91,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
         packagingFee: packagingFee > 0 ? packagingFee : undefined,
         deliveryFee: deliveryFee > 0 ? deliveryFee : undefined,
         packCount: isTakeout ? effectivePacks : undefined,
+        paymentProofUrl: paymentProofUrl || undefined,
       }
     );
     if (newOrder) setOrderPlacedSuccess(newOrder.id);
@@ -393,6 +399,117 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                       </button>
                     ))}
                   </div>
+                  {/* Direct Bank Transfer Details & Receipt Upload */}
+                  {paymentChoice === 'transfer' && (
+                    <div className="p-3 bg-neutral-100/90 border border-neutral-300 rounded-2xl space-y-2.5 animate-in fade-in">
+                      <div className="flex items-center justify-between border-b border-neutral-200/80 pb-2">
+                        <span className="font-bold text-neutral-800 text-[11px] flex items-center gap-1">
+                          <Building2 className="w-3.5 h-3.5 text-amber-600" /> Restaurant Bank Account
+                        </span>
+                        <span className="text-[10px] text-emerald-800 bg-emerald-100 font-mono font-bold px-2 py-0.5 rounded">
+                          Direct Transfer
+                        </span>
+                      </div>
+
+                      {activeRestaurant?.accountNumber ? (
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-neutral-500">Bank:</span>
+                            <span className="font-bold text-neutral-900">{activeRestaurant.bankName || 'Bank'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-neutral-500">Account No:</span>
+                            <div className="flex items-center gap-1.5 font-mono font-bold text-neutral-950 bg-white px-2 py-0.5 rounded border border-neutral-200 shadow-xs">
+                              <span>{activeRestaurant.accountNumber}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                    navigator.clipboard.writeText(activeRestaurant.accountNumber || '');
+                                    showNotification('Account number copied to clipboard!');
+                                  }
+                                }}
+                                className="text-[10px] text-amber-700 hover:text-amber-900 font-sans underline cursor-pointer"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          </div>
+                          {activeRestaurant.accountName && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-500">Account Name:</span>
+                              <span className="font-bold text-neutral-900 truncate max-w-[180px]">{activeRestaurant.accountName}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-neutral-500 italic">
+                          Staff will confirm bank transfer details with you directly upon order placement.
+                        </p>
+                      )}
+
+                      {/* I Have Paid & Proof Upload */}
+                      <div className="pt-2 border-t border-neutral-200">
+                        {!hasPaidClicked ? (
+                          <button
+                            type="button"
+                            onClick={() => setHasPaidClicked(true)}
+                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>I Have Paid (Attach Transfer Screenshot)</span>
+                          </button>
+                        ) : (
+                          <div className="space-y-2 animate-in fade-in">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-neutral-800">Payment Screenshot:</span>
+                              <button
+                                type="button"
+                                onClick={() => { setHasPaidClicked(false); setPaymentProofUrl(''); }}
+                                className="text-neutral-400 hover:text-neutral-600 text-[10px]"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+
+                            <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-neutral-300 hover:border-amber-500 rounded-xl cursor-pointer bg-white transition-colors">
+                              {paymentProofUrl ? (
+                                <div className="flex items-center gap-2.5">
+                                  <img src={paymentProofUrl} alt="Receipt" className="w-12 h-12 object-cover rounded-lg border border-neutral-200" />
+                                  <div className="text-left">
+                                    <span className="text-xs font-bold text-emerald-700 block">✓ Screenshot Attached</span>
+                                    <span className="text-[10px] text-neutral-400">Tap to replace</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-center space-y-1">
+                                  <Upload className="w-5 h-5 text-neutral-400 mx-auto" />
+                                  <span className="text-xs font-bold text-neutral-700 block">Tap to upload transfer receipt</span>
+                                  <span className="text-[10px] text-neutral-400 block">Compressed client-side</span>
+                                </div>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    try {
+                                      const compressed = await compressImageToDataUrl(file, 900);
+                                      setPaymentProofUrl(compressed);
+                                      showNotification('Payment screenshot attached!');
+                                    } catch {}
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <p className="text-[10px] text-neutral-400 text-center">
                     💚 TapMenu never holds your money. Payments go directly to {activeRestaurant?.name || 'the restaurant'}.
                   </p>

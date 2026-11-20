@@ -26,8 +26,11 @@ export const TopNav: React.FC<{
     currentTable, 
     cart, 
     waiterCalls,
-    ownerSession
+    ownerSession,
+    isCustomerRoute
   } = useApp();
+
+  const isVendor = activeRestaurant?.serviceMode === 'counter_only' || activeRestaurant?.plan === 'vendor';
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -80,8 +83,8 @@ export const TopNav: React.FC<{
             </div>
           </button>
 
-          {/* Table Badge */}
-          {currentTable && (
+          {/* Table Badge (Hidden for Vendors) */}
+          {currentTable && !isVendor && (
             <div className="flex items-center gap-1 px-2.5 py-1 bg-amber-100 border border-amber-300 rounded-lg text-[11px] sm:text-xs font-mono font-bold text-amber-950 shrink-0 shadow-xs">
               <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse"></span>
               <span>{currentTable}</span>
@@ -92,34 +95,36 @@ export const TopNav: React.FC<{
         {/* Zone 2: Actions (Waiter Buzzer, Cart, and Hamburger Dropdown) */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
 
-          {/* Waiter Buzzer — chat-bubble style */}
-          <div className="relative flex items-center">
-            <button
-              onClick={onOpenWaiterModal}
-              className="relative flex items-center gap-2 pl-3 pr-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-2xl font-bold transition-all shadow-lg"
-              title="Call Waiter / Request Bill"
-            >
-              <PhoneCall className="w-4 h-4 shrink-0" />
-              <span className="text-xs whitespace-nowrap hidden sm:inline">Call Waiter</span>
+          {/* Waiter Buzzer — chat-bubble style (Hidden for Vendors) */}
+          {!isVendor && (
+            <div className="relative flex items-center">
+              <button
+                onClick={onOpenWaiterModal}
+                className="relative flex items-center gap-2 pl-3 pr-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-2xl font-bold transition-all shadow-lg"
+                title="Call Waiter / Request Bill"
+              >
+                <PhoneCall className="w-4 h-4 shrink-0" />
+                <span className="text-xs whitespace-nowrap hidden sm:inline">Call Waiter</span>
 
-              {/* Pulsing dot when an active call exists */}
-              {waiterCalls.filter(c => c.tableNumber === currentTable).length > 0 && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 border-2 border-white animate-pulse" />
-              )}
-            </button>
+                {/* Pulsing dot when an active call exists */}
+                {waiterCalls.filter(c => c.tableNumber === currentTable).length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 border-2 border-white animate-pulse" />
+                )}
+              </button>
 
-            {/* Floating chat bubble — below the button, tail points UP */}
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 pointer-events-none select-none z-50">
-              {/* Tail pointing up */}
-              <span className="block w-0 h-0 mx-auto
-                border-l-[5px] border-l-transparent
-                border-r-[5px] border-r-transparent
-                border-b-[6px] border-b-neutral-900" />
-              <div className="bg-neutral-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-xl whitespace-nowrap shadow-lg">
-                👋 Call Waiter
+              {/* Floating chat bubble — below the button, tail points UP */}
+              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 pointer-events-none select-none z-50">
+                {/* Tail pointing up */}
+                <span className="block w-0 h-0 mx-auto
+                  border-l-[5px] border-l-transparent
+                  border-r-[5px] border-r-transparent
+                  border-b-[6px] border-b-neutral-900" />
+                <div className="bg-neutral-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-xl whitespace-nowrap shadow-lg">
+                  👋 Call Waiter
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Cart Trigger — big pill always visible */}
           <button
@@ -202,7 +207,7 @@ export const TopNav: React.FC<{
             >
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-neutral-600" />
-                <span>My Table Order</span>
+                <span>{isVendor ? 'My Order / Cart' : 'My Table Order'}</span>
               </div>
               {totalCartCount > 0 ? (
                 <span className="px-2 py-0.5 rounded-full bg-amber-500 text-neutral-950 font-mono text-[10px] font-bold">
@@ -213,56 +218,40 @@ export const TopNav: React.FC<{
               )}
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenWaiterModal();
-              }}
-              className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-neutral-100 transition-colors flex items-center justify-between"
-            >
-              <div className="flex items-center gap-2">
-                <PhoneCall className="w-4 h-4 text-amber-600" />
-                <span>Call Waiter / Request Bill</span>
-              </div>
-              <span className="text-[10px] text-amber-700 bg-amber-100/60 px-2 py-0.5 rounded font-bold">
-                Instant
-              </span>
-            </button>
-
-            {/* If Owner / Staff session is active, offer KDS link */}
-            {ownerSession && (
+            {!isVendor && (
               <button
                 type="button"
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  setCurrentView('orders');
+                  onOpenWaiterModal();
                 }}
                 className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-neutral-100 transition-colors flex items-center justify-between"
               >
                 <div className="flex items-center gap-2">
-                  <ChefHat className="w-4 h-4 text-emerald-600" />
-                  <span>Kitchen Display (KDS)</span>
+                  <PhoneCall className="w-4 h-4 text-amber-600" />
+                  <span>Call Waiter / Request Bill</span>
                 </div>
-                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold">
-                  Staff
+                <span className="text-[10px] text-amber-700 bg-amber-100/60 px-2 py-0.5 rounded font-bold">
+                  Instant
                 </span>
               </button>
             )}
           </div>
 
-          {/* Dine-in Table Context & Direct Payments Info */}
-          <div className="pt-2.5 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-500">
-            <span className="flex items-center gap-1">
-              <CreditCard className="w-3.5 h-3.5 text-neutral-400" />
-              <span>Direct Staff POS / Cash</span>
-            </span>
-            {currentTable && (
-              <span className="font-mono font-bold text-neutral-700 bg-neutral-100 px-2 py-0.5 rounded">
-                Table: {currentTable}
+          {/* Dine-in Table Context & Direct Payments Info (Hidden for Vendors) */}
+          {!isVendor && (
+            <div className="pt-2.5 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-500">
+              <span className="flex items-center gap-1">
+                <CreditCard className="w-3.5 h-3.5 text-neutral-400" />
+                <span>Direct Staff POS / Cash</span>
               </span>
-            )}
-          </div>
+              {currentTable && (
+                <span className="font-mono font-bold text-neutral-700 bg-neutral-100 px-2 py-0.5 rounded">
+                  Table: {currentTable}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
     </header>

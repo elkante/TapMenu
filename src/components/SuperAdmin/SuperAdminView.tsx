@@ -34,7 +34,8 @@ import {
   Settings,
   Phone,
   ExternalLink, 
-  Trash2, 
+  Trash2,
+  Download, 
   CheckCircle2, 
   Lock, 
   Search, 
@@ -904,6 +905,14 @@ export const SuperAdminView: React.FC = () => {
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
+                                onClick={() => setQrModalTenant(t)}
+                                className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg font-bold text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
+                                title="View and download QR codes and customer links"
+                              >
+                                <QrCode className="w-3.5 h-3.5" />
+                                <span>QR & Links</span>
+                              </button>
+                              <button
                                 onClick={() => handleLoginAs(t)}
                                 className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg font-bold text-[11px] transition-colors"
                                 title="Login and manage this restaurant's menu"
@@ -1047,6 +1056,13 @@ export const SuperAdminView: React.FC = () => {
 
                     {/* Card Actions */}
                     <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => setQrModalTenant(t)}
+                        className="py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                        <span>QR & Links</span>
+                      </button>
                       <button
                         onClick={() => handleLoginAs(t)}
                         className="flex-1 py-2 px-3 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow"
@@ -1737,6 +1753,173 @@ export const SuperAdminView: React.FC = () => {
         hasPlanChanges={hasPlanChanges}
         onLockSession={handleLock}
       />
+      {/* ── Admin QR & Links Popup Modal ── */}
+      {qrModalTenant && (() => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tapmenu.me';
+        const isVendorTenant = qrModalTenant.plan === 'vendor' || qrModalTenant.serviceMode === 'counter_only';
+        const primaryMenuUrl = `${origin}/?r=${qrModalTenant.slug}`;
+        const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(primaryMenuUrl)}`;
+
+        const downloadQr = async () => {
+          try {
+            const resp = await fetch(qrImageUrl);
+            const blob = await resp.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `${qrModalTenant.slug}-menu-qr.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showNotification('QR code downloaded!');
+          } catch {
+            window.open(qrImageUrl, '_blank');
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-neutral-900 border border-neutral-750 w-full max-w-lg rounded-3xl p-5 shadow-2xl space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <QrCode className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-white text-sm sm:text-base">{qrModalTenant.name}</h3>
+                    <p className="text-[11px] text-neutral-400 font-mono">slug: {qrModalTenant.slug} · {isVendorTenant ? 'Vendor' : 'Restaurant'}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setQrModalTenant(null)}
+                  className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* QR Image & Download */}
+              <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-inner border border-neutral-200">
+                <img src={qrImageUrl} alt="QR Code" className="w-44 h-44 rounded-lg object-contain" />
+                <span className="text-[10px] text-neutral-500 font-mono mt-2">Scan to open digital menu</span>
+                <button
+                  type="button"
+                  onClick={downloadQr}
+                  className="mt-3 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Download QR Image (PNG)</span>
+                </button>
+              </div>
+
+              {/* Main Menu Link */}
+              <div className="space-y-1">
+                <label className="font-bold text-neutral-400 uppercase tracking-wider text-[10px]">Primary Menu Link</label>
+                <div className="flex items-center gap-2 p-2 bg-neutral-950 rounded-xl border border-neutral-800">
+                  <span className="font-mono text-amber-300 text-xs truncate flex-1">{primaryMenuUrl}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(primaryMenuUrl);
+                      showNotification('Menu link copied to clipboard!');
+                    }}
+                    className="px-3 py-1 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg font-bold text-[11px] shrink-0 cursor-pointer"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              {/* Table Links list if Restaurant */}
+              {!isVendorTenant && qrModalTenant.tables && qrModalTenant.tables.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="font-bold text-neutral-400 uppercase tracking-wider text-[10px]">
+                    Table Direct Links ({qrModalTenant.tables.length})
+                  </label>
+                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                    {qrModalTenant.tables.map(tbl => {
+                      const tableUrl = `${origin}/?r=${qrModalTenant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
+                      return (
+                        <div key={tbl.id} className="flex items-center justify-between p-2 bg-neutral-950/60 rounded-xl border border-neutral-850">
+                          <span className="font-mono font-bold text-white text-[11px]">{tbl.tableNumber}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-neutral-400 text-[10px] truncate max-w-[150px]">{tableUrl}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(tableUrl);
+                                showNotification(`${tbl.tableNumber} link copied!`);
+                              }}
+                              className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 rounded font-bold text-[10px] cursor-pointer"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* CAC Certificate Verification in Admin Popup */}
+              {qrModalTenant.cacCertificateUrl && (
+                <div className="p-3 bg-neutral-950 rounded-2xl border border-neutral-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">CAC Registration Document</span>
+                    <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                      qrModalTenant.cacStatus === 'verified'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}>
+                      Status: {qrModalTenant.cacStatus || 'pending'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <img src={qrModalTenant.cacCertificateUrl} alt="CAC" className="w-14 h-14 object-cover rounded-lg border border-neutral-700" />
+                    <div className="flex items-center gap-2 flex-1">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await syncRestaurantMetaToSupabase(qrModalTenant.id, { cacStatus: 'verified' });
+                          setTenants(prev => prev.map(t => t.id === qrModalTenant.id ? { ...t, cacStatus: 'verified' } : t));
+                          qrModalTenant.cacStatus = 'verified';
+                          showNotification('CAC marked verified!');
+                        }}
+                        className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs cursor-pointer"
+                      >
+                        ✓ Verify CAC
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await syncRestaurantMetaToSupabase(qrModalTenant.id, { cacStatus: 'rejected' });
+                          setTenants(prev => prev.map(t => t.id === qrModalTenant.id ? { ...t, cacStatus: 'rejected' } : t));
+                          qrModalTenant.cacStatus = 'rejected';
+                          showNotification('CAC marked rejected');
+                        }}
+                        className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 rounded-lg text-xs font-bold cursor-pointer"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setQrModalTenant(null)}
+                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

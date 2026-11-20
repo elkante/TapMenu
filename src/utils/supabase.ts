@@ -1,4 +1,4 @@
-﻿import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { RestaurantTenant, FoodItem, Order, WaiterCall, MenuBookPage } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kxszokrflzknhtsicbzm.supabase.co';
@@ -83,6 +83,8 @@ export function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+export const compressImageToDataUrl = fileToDataUrl;
+
 /**
  * Local cache helpers
  */
@@ -128,7 +130,7 @@ export function setActiveSession(session: OwnerSession | null) {
  */
 function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const currency = rRow.currency || 'â‚¦';
+  const currency = rRow.currency || '₦';
 
   // Check local cache for existing restaurant structure
   const stored = getStoredRestaurants();
@@ -275,15 +277,17 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
     }));
   }
 
-  const coverColor = rRow.cover_color || rRow.primary_color || '#0c2e22';
-  const accentColor = rRow.accent_color || '#d4af37';
+  const designObj = (typeof rRow.design === 'object' && rRow.design !== null) ? rRow.design : {};
+  const coverColor = rRow.cover_color || designObj.coverColor || designObj.primaryColor || localMatch?.design?.coverColor || '#0c2e22';
+  const coverTextColor = rRow.cover_text_color || designObj.coverTextColor || localMatch?.design?.coverTextColor || '#D4AF37';
+  const accentColor = rRow.accent_color || designObj.accentColor || localMatch?.design?.accentColor || '#d4af37';
 
   return {
     id: rRow.id,
     slug: rRow.slug,
     name: rRow.name,
     tagline: rRow.tagline || 'Kitchen & Bar',
-    logo: rRow.logo || localMatch?.logo || 'ðŸ›¡ï¸',
+    logo: rRow.logo || localMatch?.logo || '🍽️',
     coverImage: rRow.cover_image || localMatch?.coverImage || '',
     address: rRow.address || localMatch?.address || '',
     phone: rRow.phone || localMatch?.phone || '',
@@ -292,22 +296,31 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
     tableLimit: (rRow.table_limit !== undefined && rRow.table_limit !== null) ? Number(rRow.table_limit) : undefined,
     status: (rRow.status as any) || 'active',
     ownerEmail: rRow.email || rRow.owner_email || localMatch?.ownerEmail || (rRow.owner_id ? undefined : `admin@${rRow.slug}.com`),
+    serviceMode: rRow.service_mode || designObj.serviceMode || (rRow.plan === 'vendor' ? 'counter_only' : (localMatch?.serviceMode || 'table_service')),
+    packagingFeePerPack: rRow.packaging_fee !== undefined ? Number(rRow.packaging_fee) : (designObj.packagingFeePerPack ?? localMatch?.packagingFeePerPack ?? 500),
+    deliveryFee: rRow.delivery_fee !== undefined ? Number(rRow.delivery_fee) : (designObj.deliveryFee ?? localMatch?.deliveryFee ?? 1000),
+    bankName: rRow.bank_name || designObj.bankName || localMatch?.bankName || '',
+    accountNumber: rRow.account_number || designObj.accountNumber || localMatch?.accountNumber || '',
+    accountName: rRow.account_name || designObj.accountName || localMatch?.accountName || '',
+    cacCertificateUrl: rRow.cac_certificate_url || designObj.cacCertificateUrl || localMatch?.cacCertificateUrl || '',
+    cacStatus: rRow.cac_status || designObj.cacStatus || localMatch?.cacStatus || 'none',
     quickMenuEnabled: true,
     allowOrdering: true,
     tableOrderingEnabled: true,
     design: {
-      templateId: 'emerald_gold',
-      paperTexture: 'emerald_leather',
-      fontStyle: 'serif_luxury',
+      templateId: designObj.templateId || 'emerald_gold',
+      paperTexture: designObj.paperTexture || 'emerald_leather',
+      fontStyle: designObj.fontStyle || 'serif_luxury',
       primaryColor: coverColor,
       accentColor: accentColor,
       coverColor: coverColor,
-      textColor: '#1c1917',
-      secondaryTextColor: '#78716c',
-      borderColor: '#e7e5e4',
-      showPageNumbers: true,
-      enableAudioEffect: true,
-      showPriceSymbols: true,
+      coverTextColor: coverTextColor,
+      textColor: designObj.textColor || '#1c1917',
+      secondaryTextColor: designObj.secondaryTextColor || '#78716c',
+      borderColor: designObj.borderColor || '#e7e5e4',
+      showPageNumbers: designObj.showPageNumbers ?? true,
+      enableAudioEffect: designObj.enableAudioEffect ?? true,
+      showPriceSymbols: designObj.showPriceSymbols ?? true,
       currencySymbol: currency,
     },
     tables,
@@ -423,7 +436,7 @@ export async function registerRestaurant(data: {
           slug: cleanSlug,
           tagline: data.tagline?.trim() || 'Kitchen & Bar',
           logo: data.logo || 'ðŸ›¡ï¸',
-          currency: data.currency || 'â‚¦',
+          currency: data.currency || '₦',
           plan: initialPlan,
           table_limit: initialTableLimit,
           service_mode: initialServiceMode,
@@ -442,7 +455,7 @@ export async function registerRestaurant(data: {
             slug: cleanSlug,
             tagline: data.tagline?.trim() || 'Kitchen & Bar',
             logo: data.logo || 'ðŸ›¡ï¸',
-            currency: data.currency || 'â‚¦',
+            currency: data.currency || '₦',
           }
         ]);
         insErr = retry.error;
@@ -467,7 +480,7 @@ export async function registerRestaurant(data: {
     slug: cleanSlug,
     tagline: data.tagline?.trim() || 'Kitchen & Bar',
     logo: data.logo || 'ðŸ›¡ï¸',
-    currency: data.currency || 'â‚¦',
+    currency: data.currency || '₦',
     cover_color: coverColor,
     plan: initialPlan,
     table_limit: initialTableLimit,
@@ -694,7 +707,7 @@ export async function syncOrderToSupabase(order: Order): Promise<boolean> {
     }
 
     // Clean payload matching exact Supabase orders table schema
-    // Always include payment_method in base payload â€” this is a core field
+    // Always include payment_method in base payload — this is a core field
     const basePayload: Record<string, any> = {
       id: order.id,
       restaurant_id: order.restaurantId,
@@ -704,7 +717,7 @@ export async function syncOrderToSupabase(order: Order): Promise<boolean> {
       total: Number(order.total) || 0,
       status: order.status || 'pending',
       source: order.source || 'qr',
-      payment_method: order.paymentMethod || 'pos', // Always persist â€” prevents cash showing as POS
+      payment_method: order.paymentMethod || 'pos', // Always persist — prevents cash showing as POS
     };
 
     const fullPayload: Record<string, any> = {
@@ -715,6 +728,10 @@ export async function syncOrderToSupabase(order: Order): Promise<boolean> {
       ...(order.orderType ? { order_type: order.orderType } : {}),
       ...(order.packagingFee !== undefined ? { packaging_fee: order.packagingFee } : {}),
       ...(order.packCount !== undefined ? { pack_count: order.packCount } : {}),
+      ...(order.deliveryAddress ? { delivery_address: order.deliveryAddress } : {}),
+      ...(order.deliveryFee !== undefined ? { delivery_fee: order.deliveryFee } : {}),
+      ...(order.paymentProofUrl ? { payment_proof_url: order.paymentProofUrl } : {}),
+      ...(order.paymentVerified !== undefined ? { payment_verified: order.paymentVerified } : {}),
     };
 
     let { error } = await supabase.from('orders').insert([fullPayload]);
@@ -774,7 +791,7 @@ export async function syncWaiterCallToSupabase(call: WaiterCall): Promise<boolea
 export async function fetchOrdersFromSupabase(restaurantId: string, slug?: string): Promise<Order[]> {
   if (!supabase || !restaurantId) return [];
   try {
-    // Only fetch today's orders â€” drastically cuts egress vs fetching all-time history
+    // Only fetch today's orders — drastically cuts egress vs fetching all-time history
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayISO = todayStart.toISOString();
@@ -1285,16 +1302,66 @@ export async function syncRestaurantMetaToSupabase(
     if (meta.phone !== undefined) updatePayload.phone = meta.phone;
     if (meta.openingHours !== undefined) updatePayload.opening_hours = meta.openingHours;
     if (meta.packagingFeePerPack !== undefined) updatePayload.packaging_fee = meta.packagingFeePerPack;
-    if (meta.design?.primaryColor) updatePayload.primary_color = meta.design.primaryColor;
+    if (meta.deliveryFee !== undefined) updatePayload.delivery_fee = meta.deliveryFee;
+    if (meta.serviceMode !== undefined) updatePayload.service_mode = meta.serviceMode;
+
+    // Fetch existing row to merge design & settings cleanly
+    let existingDesign: Record<string, any> = {};
+    try {
+      const { data: existingRow } = await supabase
+        .from('restaurants')
+        .select('design')
+        .eq('id', restaurantId)
+        .maybeSingle();
+
+      if (existingRow && typeof existingRow.design === 'object' && existingRow.design !== null) {
+        existingDesign = existingRow.design;
+      }
+    } catch {}
+
+    const mergedDesign = {
+      ...existingDesign,
+      ...(meta.design || {}),
+      ...(meta.bankName !== undefined ? { bankName: meta.bankName } : {}),
+      ...(meta.accountNumber !== undefined ? { accountNumber: meta.accountNumber } : {}),
+      ...(meta.accountName !== undefined ? { accountName: meta.accountName } : {}),
+      ...(meta.cacCertificateUrl !== undefined ? { cacCertificateUrl: meta.cacCertificateUrl } : {}),
+      ...(meta.cacStatus !== undefined ? { cacStatus: meta.cacStatus } : {}),
+      ...(meta.packagingFeePerPack !== undefined ? { packagingFeePerPack: meta.packagingFeePerPack } : {}),
+      ...(meta.deliveryFee !== undefined ? { deliveryFee: meta.deliveryFee } : {}),
+    };
+
+    updatePayload.design = mergedDesign;
+
+    // Optional top-level columns if present in table
     if (meta.design?.coverColor) updatePayload.cover_color = meta.design.coverColor;
+    if (meta.design?.coverTextColor) updatePayload.cover_text_color = meta.design.coverTextColor;
+    if (meta.design?.primaryColor) updatePayload.primary_color = meta.design.primaryColor;
     if (meta.design?.accentColor) updatePayload.accent_color = meta.design.accentColor;
     if (meta.design?.currencySymbol) updatePayload.currency = meta.design.currencySymbol;
+    if (meta.bankName !== undefined) updatePayload.bank_name = meta.bankName;
+    if (meta.accountNumber !== undefined) updatePayload.account_number = meta.accountNumber;
+    if (meta.accountName !== undefined) updatePayload.account_name = meta.accountName;
+    if (meta.cacCertificateUrl !== undefined) updatePayload.cac_certificate_url = meta.cacCertificateUrl;
+    if (meta.cacStatus !== undefined) updatePayload.cac_status = meta.cacStatus;
 
     if (Object.keys(updatePayload).length > 0) {
-      const { error } = await supabase
+      let { error } = await supabase
         .from('restaurants')
         .update(updatePayload)
         .eq('id', restaurantId);
+
+      // If top-level columns fail due to missing schema columns, fall back safely to design JSONB!
+      if (error && (error.message?.includes('column') || error.code === '42703')) {
+        const safePayload: Record<string, any> = { design: mergedDesign };
+        if (updatePayload.name) safePayload.name = updatePayload.name;
+        if (updatePayload.tagline) safePayload.tagline = updatePayload.tagline;
+        if (updatePayload.logo) safePayload.logo = updatePayload.logo;
+        if (updatePayload.address) safePayload.address = updatePayload.address;
+        if (updatePayload.phone) safePayload.phone = updatePayload.phone;
+        const res = await supabase.from('restaurants').update(safePayload).eq('id', restaurantId);
+        error = res.error;
+      }
 
       if (error) {
         console.warn('Supabase restaurant meta update notice:', error.message);

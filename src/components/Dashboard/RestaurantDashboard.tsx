@@ -21,6 +21,7 @@ import {
   Coins,
   CreditCard,
   Building2,
+  ShieldCheck,
   PhoneCall,
   Upload,
   Pencil,
@@ -43,6 +44,7 @@ import { FoodItem, Order } from '../../types';
 import { getDishFallbackImage } from '../Flipbook/FlipPageRenderer';
 import { NotchedBottomBar } from '../Navigation/NotchedBottomBar';
 import { playKitchenChime } from '../../utils/audio';
+import { compressImageToDataUrl } from '../../utils/supabase';
 import { KitchenInventoryView } from './KitchenInventoryView';
 import { KitchenExpenseView } from './KitchenExpenseView';
 import { KitchenArchiveView } from './KitchenArchiveView';
@@ -821,32 +823,25 @@ export const RestaurantDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* If before 6 PM warning banner */}
-          {new Date().getHours() < 18 && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2 mb-3">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold block">Shift Close Restricted (Available from 6:00 PM)</span>
-                <span>You can start shifts anytime, but closing out today's register is only unlocked from <strong>6:00 PM onwards</strong>. Current time: {liveClock}.</span>
-              </div>
+          {/* Shift confirmation notice */}
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2 mb-3">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block">End Today's Kitchen Shift</span>
+              <span>Are you sure you want to end today's shift? This compiles all sales and expenses into today's permanent Z-Report archive.</span>
             </div>
-          )}
+          </div>
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-3 border-t border-neutral-100">
             <button
               type="button"
-              disabled={new Date().getHours() < 18}
               onClick={handleConfirmEndDay}
-              className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-md ${
-                new Date().getHours() < 18
-                  ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
-                  : 'bg-neutral-900 hover:bg-neutral-800 text-white cursor-pointer'
-              }`}
-              title={new Date().getHours() < 18 ? "Available from 6:00 PM onwards" : "Close Day & Archive"}
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-md bg-rose-600 hover:bg-rose-500 text-white cursor-pointer active:scale-95"
+              title="Close Day & Save Archive"
             >
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{new Date().getHours() < 18 ? 'Locked Until 6:00 PM' : 'Close Day & Archive'}</span>
+              <Check className="w-3.5 h-3.5 text-white" />
+              <span>Yes, Close Day & Save Archive</span>
             </button>
           </div>
         </div>
@@ -1067,7 +1062,7 @@ export const RestaurantDashboard: React.FC = () => {
             >
               <div className="flex items-center gap-2.5">
                 <QrCode className="w-4 h-4 shrink-0" />
-                <span>Table QR Codes</span>
+                <span>{isVendor ? 'Counter QR & Links' : 'Table QR Codes'}</span>
               </div>
               <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
             </button>
@@ -2176,6 +2171,134 @@ export const RestaurantDashboard: React.FC = () => {
                 )}
               </div>
 
+              {/* ── Restaurant Bank Details for Direct Customer Transfers ── */}
+              <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between border-b border-neutral-200/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-amber-600" />
+                    <span className="font-bold text-neutral-900 text-xs">Direct Bank Transfer Details</span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">
+                    Seen in Checkout
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  Customers choosing "Bank Transfer" will pay directly to this account. Only you (the owner) can update these details.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-neutral-600 mb-1">Bank Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. GTBank / Access Bank / Zenith"
+                      value={activeRestaurant.bankName || ''}
+                      onChange={(e) => updateRestaurantMeta({ bankName: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-xl focus:outline-none focus:border-neutral-900 text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-neutral-600 mb-1">Account Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 0123456789"
+                      value={activeRestaurant.accountNumber || ''}
+                      onChange={(e) => updateRestaurantMeta({ accountNumber: e.target.value.replace(/\D/g, '') })}
+                      className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-xl font-mono font-bold focus:outline-none focus:border-neutral-900 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Account Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Kfcc Foods & Lounge Ltd"
+                    value={activeRestaurant.accountName || ''}
+                    onChange={(e) => updateRestaurantMeta({ accountName: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-xl focus:outline-none focus:border-neutral-900 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* ── CAC Certificate Verification (Optional for Basic / Pro) ── */}
+              <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between border-b border-neutral-200/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <span className="font-bold text-neutral-900 text-xs">CAC Registration Document (Optional)</span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                    activeRestaurant.cacStatus === 'verified'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : activeRestaurant.cacStatus === 'pending'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-neutral-200 text-neutral-600'
+                  }`}>
+                    {activeRestaurant.cacStatus === 'verified' ? '✓ CAC Verified' :
+                     activeRestaurant.cacStatus === 'pending' ? '⏳ Pending Admin Review' :
+                     'Optional'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  Upload your Corporate Affairs Commission (CAC) document or business registration for verified platform standing.
+                </p>
+
+                {activeRestaurant.cacCertificateUrl ? (
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-neutral-200">
+                    <img 
+                      src={activeRestaurant.cacCertificateUrl} 
+                      alt="CAC Certificate" 
+                      className="w-16 h-16 object-cover rounded-lg border border-neutral-200 shadow-xs"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-bold text-xs text-neutral-900 block truncate">CAC Certificate Uploaded</span>
+                      <span className="text-[10px] text-neutral-400 block">Status: {activeRestaurant.cacStatus || 'pending'}</span>
+                    </div>
+                    <label className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-bold cursor-pointer transition-colors">
+                      Replace
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const compressed = await compressImageToDataUrl(file, 1200);
+                              updateRestaurantMeta({ cacCertificateUrl: compressed, cacStatus: 'pending' });
+                              showNotification('CAC certificate uploaded for verification!');
+                            } catch {}
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-1.5 p-4 border-2 border-dashed border-neutral-300 hover:border-amber-500 rounded-xl cursor-pointer bg-white transition-colors">
+                    <Upload className="w-5 h-5 text-neutral-400" />
+                    <span className="font-bold text-neutral-700 text-xs">Upload CAC Document / Certificate</span>
+                    <span className="text-[10px] text-neutral-400">PNG, JPG or Photo (compressed client-side)</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const compressed = await compressImageToDataUrl(file, 1200);
+                            updateRestaurantMeta({ cacCertificateUrl: compressed, cacStatus: 'pending' });
+                            showNotification('CAC certificate uploaded for verification!');
+                          } catch {}
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+
               {/* Account & Session Management */}
               <div className="pt-4 border-t border-neutral-200 space-y-2">
                 <label className="block font-bold text-neutral-900 text-xs">Account Session</label>
@@ -2617,7 +2740,7 @@ export const RestaurantDashboard: React.FC = () => {
                 >
                   <div className="flex items-center gap-2.5">
                     <QrCode className="w-4 h-4 shrink-0" />
-                    <span>Table QR Codes</span>
+                    <span>{isVendor ? 'Counter QR & Links' : 'Table QR Codes'}</span>
                   </div>
                   <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
                 </button>
