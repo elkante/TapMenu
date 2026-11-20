@@ -821,15 +821,32 @@ export const RestaurantDashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* If before 6 PM warning banner */}
+          {new Date().getHours() < 18 && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2 mb-3">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Shift Close Restricted (Available from 6:00 PM)</span>
+                <span>You can start shifts anytime, but closing out today's register is only unlocked from <strong>6:00 PM onwards</strong>. Current time: {liveClock}.</span>
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-3 border-t border-neutral-100">
             <button
               type="button"
+              disabled={new Date().getHours() < 18}
               onClick={handleConfirmEndDay}
-              className="w-full sm:w-auto px-6 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+              className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-md ${
+                new Date().getHours() < 18
+                  ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-white cursor-pointer'
+              }`}
+              title={new Date().getHours() < 18 ? "Available from 6:00 PM onwards" : "Close Day & Archive"}
             >
               <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Close Day & Archive</span>
+              <span>{new Date().getHours() < 18 ? 'Locked Until 6:00 PM' : 'Close Day & Archive'}</span>
             </button>
           </div>
         </div>
@@ -1988,6 +2005,76 @@ export const RestaurantDashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* Cover Text & Foil Color */}
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Menu Cover Title & Tagline Color</label>
+                <div className="flex items-center gap-2 p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl">
+                  {[
+                    { name: 'Metallic Gold Foil', hex: '#D4AF37' },
+                    { name: 'Crisp White', hex: '#FFFFFF' },
+                    { name: 'Warm Cream', hex: '#F5EFE6' },
+                    { name: 'Charcoal Dark', hex: '#18181B' },
+                    { name: 'Amber Glow', hex: '#F59E0B' },
+                  ].map(preset => (
+                    <button
+                      type="button"
+                      key={preset.hex}
+                      onClick={() => updateRestaurantMeta({ design: { ...activeRestaurant.design, coverTextColor: preset.hex } })}
+                      className={`w-7 h-7 rounded-full border-2 transition-all ${
+                        (activeRestaurant.design.coverTextColor || '#D4AF37') === preset.hex ? 'scale-110 ring-2 ring-amber-400 shadow-md' : 'opacity-80'
+                      }`}
+                      style={{ backgroundColor: preset.hex, borderColor: preset.hex === '#FFFFFF' ? '#e5e7eb' : preset.hex }}
+                      title={preset.name}
+                    />
+                  ))}
+                  <div className="h-5 w-[1px] bg-neutral-300 mx-1" />
+                  <input
+                    type="color"
+                    value={activeRestaurant.design.coverTextColor || '#D4AF37'}
+                    onChange={(e) => updateRestaurantMeta({ design: { ...activeRestaurant.design, coverTextColor: e.target.value } })}
+                    className="w-7 h-7 rounded-lg cursor-pointer bg-transparent border-0"
+                    title="Pick custom cover text color"
+                  />
+                </div>
+              </div>
+
+              {/* Packaging & Delivery Rates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Takeout Packaging Rate</label>
+                  <div className="flex items-center bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-neutral-700 font-mono font-bold">
+                    <span>{activeRestaurant.design.currencySymbol}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={50}
+                      value={activeRestaurant.packagingFeePerPack ?? 500}
+                      onChange={(e) => updateRestaurantMeta({ packagingFeePerPack: Number(e.target.value) })}
+                      className="w-full bg-transparent text-neutral-900 focus:outline-none ml-1 text-xs"
+                      placeholder="500"
+                    />
+                  </div>
+                  <span className="text-[10px] text-neutral-400 block mt-0.5">Per takeaway foil pack</span>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Standard Delivery Fee</label>
+                  <div className="flex items-center bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-neutral-700 font-mono font-bold">
+                    <span>{activeRestaurant.design.currencySymbol}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={100}
+                      value={activeRestaurant.deliveryFee ?? 1000}
+                      onChange={(e) => updateRestaurantMeta({ deliveryFee: Number(e.target.value) })}
+                      className="w-full bg-transparent text-neutral-900 focus:outline-none ml-1 text-xs"
+                      placeholder="1000"
+                    />
+                  </div>
+                  <span className="text-[10px] text-neutral-400 block mt-0.5">Applied to delivery orders</span>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-bold text-neutral-600 mb-1">Currency Symbol</label>
                 <input
@@ -2618,3 +2705,4 @@ export const RestaurantDashboard: React.FC = () => {
     </div>
   );
 };
+

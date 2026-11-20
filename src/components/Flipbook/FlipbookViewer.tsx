@@ -350,18 +350,6 @@ export const FlipbookViewer: React.FC = () => {
                   </div>
                 </button>
               )}
-
-              {/* Mobile Tap Zones */}
-              <div 
-                onClick={goToPrevPage}
-                className="absolute top-0 bottom-0 left-0 w-16 z-25 cursor-pointer"
-                title="Tap left edge to go back"
-              />
-              <div 
-                onClick={goToNextPage}
-                className="absolute top-0 bottom-0 right-0 w-16 z-25 cursor-pointer"
-                title="Tap right edge to go forward"
-              />
             </div>
           </div>
         </div>

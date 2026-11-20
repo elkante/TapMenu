@@ -41,6 +41,7 @@ export interface MenuBookDesign {
   primaryColor: string;
   accentColor: string;
   coverColor?: string;
+  coverTextColor?: string;
   textColor: string;
   secondaryTextColor: string;
   borderColor: string;
@@ -115,6 +116,8 @@ export interface RestaurantTenant {
   serviceMode?: 'table_service' | 'counter_only';
   /** Takeout pack charge per item or per order (default ₦500) */
   packagingFeePerPack?: number;
+  /** Delivery charge fee (default ₦1000) */
+  deliveryFee?: number;
   /** Subscription & Billing Tracking */
   subscriptionExpiresAt?: string;
   subscriptionStatus?: 'active' | 'grace_period' | 'past_due' | 'suspended';
@@ -153,6 +156,7 @@ export interface Order {
   /** Takeout / Delivery packaging options */
   orderType?: 'dine_in' | 'takeaway' | 'both' | 'delivery';
   packagingFee?: number;
+  deliveryFee?: number;
   packCount?: number;
   deliveryAddress?: string;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar, Filter, DollarSign, Printer, ChevronRight, TrendingUp, TrendingDown, ShoppingBag, CreditCard, Banknote, Building2, Clock, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Order, RestaurantTenant } from '../../types';
 import { ExpenseItem } from '../../types';
@@ -367,3 +367,4 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
     </div>
   );
 };
+

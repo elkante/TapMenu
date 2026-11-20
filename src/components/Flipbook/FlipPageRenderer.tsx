@@ -179,36 +179,58 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
             </div>
           )}
 
-          {/* Large Embossed Metallic Gold Title */}
+          {/* Large Embossed Metallic Gold Title (or Custom Cover Text Color) */}
           <h1 
-            className="font-serif text-3xl xs:text-4xl sm:text-5xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-[#FFF5C0] via-[#D4AF37] to-[#A07818] leading-tight"
+            className={`font-serif text-3xl xs:text-4xl sm:text-5xl font-bold tracking-tight leading-tight ${
+              design.coverTextColor 
+                ? '' 
+                : 'text-transparent bg-clip-text bg-gradient-to-b from-[#FFF5C0] via-[#D4AF37] to-[#A07818]'
+            }`}
             style={{
-              textShadow: '0 2px 6px rgba(0,0,0,0.7)',
+              color: design.coverTextColor || undefined,
+              textShadow: design.coverTextColor 
+                ? '0 2px 8px rgba(0,0,0,0.85)' 
+                : '0 2px 6px rgba(0,0,0,0.7)',
               letterSpacing: '-0.01em'
             }}
           >
             {restaurantName}
           </h1>
 
-          {/* Subtitle / Tagline in Spaced Gold Capitals */}
+          {/* Subtitle / Tagline */}
           <p 
-            className="text-xs sm:text-sm font-semibold uppercase tracking-[0.28em] text-[#E8C868] mt-3"
-            style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}
+            className="text-xs sm:text-sm font-semibold uppercase tracking-[0.28em] mt-3"
+            style={{ 
+              color: design.coverTextColor ? `${design.coverTextColor}dd` : '#E8C868',
+              textShadow: '0 1px 3px rgba(0,0,0,0.8)' 
+            }}
           >
             {restaurantTagline || 'KITCHEN & BAR'}
           </p>
 
           {/* Tapered Gold Divider Line */}
           <div className="flex items-center justify-center gap-2 mt-4 max-w-[160px] mx-auto opacity-75">
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent to-[#D4AF37]" />
-            <div className="w-1.5 h-1.5 rotate-45 bg-[#D4AF37]" />
-            <div className="flex-1 h-[1px] bg-gradient-to-l from-transparent to-[#D4AF37]" />
+            <div 
+              className="flex-1 h-[1px]" 
+              style={{ background: `linear-gradient(to right, transparent, ${design.coverTextColor || '#D4AF37'})` }} 
+            />
+            <div 
+              className="w-1.5 h-1.5 rotate-45" 
+              style={{ backgroundColor: design.coverTextColor || '#D4AF37' }} 
+            />
+            <div 
+              className="flex-1 h-[1px]" 
+              style={{ background: `linear-gradient(to left, transparent, ${design.coverTextColor || '#D4AF37'})` }} 
+            />
           </div>
         </div>
 
         {/* Bottom Prompts: Tap or Swipe to Open */}
         <div className="relative z-10 text-center pb-8 sm:pb-10 px-6">
-          <div className="text-[11px] sm:text-xs font-bold tracking-[0.25em] text-[#D4AF37] uppercase flex items-center justify-center gap-2 drop-shadow">
+          <div 
+            className="text-[11px] sm:text-xs font-bold tracking-[0.25em] uppercase flex items-center justify-center gap-2 drop-shadow"
+            style={{ color: design.coverTextColor || '#D4AF37' }}
+          >
             <span>TAP OR SWIPE TO OPEN</span>
           </div>
           {restaurantHours && (
@@ -225,7 +247,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
   // INTERIOR MENU PAGES: Luxury Cream Parchment with Dot Leaders (Ref: Image 1)
   // =========================================================================
   return (
-    <div className={`w-full h-full p-4 sm:p-6 flex flex-col justify-between relative overflow-hidden select-none ${getTextureBg()}`}>
+    <div className={`w-full h-full p-3 sm:p-5 flex flex-col justify-between relative overflow-hidden select-none ${getTextureBg()}`}>
       {/* Book Spine Shadow on left */}
       <div 
         className="absolute top-0 bottom-0 left-0 w-6 z-10 pointer-events-none"
@@ -235,7 +257,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
       />
 
       {/* Page Header */}
-      <div className="mb-3 shrink-0 pb-2 border-b border-stone-300/80">
+      <div className="mb-2 shrink-0 pb-2 border-b border-stone-300/80">
         <div className="flex items-baseline justify-between gap-3">
           <div>
             <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-amber-800 font-bold block">
@@ -254,8 +276,14 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
         </div>
       </div>
 
-      {/* Main Content Area: Dishes list with Dot Leaders */}
-      <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 pb-2">
+      {/* Main Content Area: Dishes list with Dot Leaders & Smooth Native Touch Scroll */}
+      <div 
+        className="flex-1 overflow-y-auto space-y-2 px-0.5 pr-1.5 pb-6 overscroll-contain"
+        style={{
+          touchAction: 'pan-y',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
         {page.items.length === 0 ? (
           <div className="py-12 text-center text-stone-400">
             <p className="text-xs italic">No dishes added to this section yet.</p>
@@ -265,7 +293,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
             <div
               key={item.id}
               onClick={() => !item.isSoldOut && onSelectItem?.(item)}
-              className={`p-2.5 rounded-xl transition-all flex items-start gap-3 group relative border ${
+              className={`p-2 rounded-xl transition-all flex items-center gap-2.5 group relative border ${
                 item.isSoldOut 
                   ? 'opacity-55 cursor-not-allowed bg-stone-100/60 border-stone-200' 
                   : 'cursor-pointer hover:bg-stone-50/80 border-transparent hover:border-amber-200/80 active:scale-[0.995]'
@@ -275,7 +303,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
               {(() => {
                 const displayImage = item.imageUrl || getDishFallbackImage(item.name, page.title);
                 return (
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-stone-200 relative shadow-xs border border-stone-200/80">
+                  <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-stone-200 relative shadow-xs border border-stone-200/80">
                     <img
                       src={displayImage}
                       alt={item.name}
@@ -294,7 +322,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
               })()}
 
               {/* Dish info & Dot-Leader Price */}
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 pr-0.5">
                 <div className="flex items-baseline justify-between gap-1">
                   <span className={`text-xs sm:text-sm font-bold text-stone-900 truncate ${
                     !item.isSoldOut ? 'group-hover:text-amber-900 transition-colors' : ''
@@ -303,7 +331,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
                   </span>
 
                   {/* Dot Leader */}
-                  <span className="flex-1 border-b border-dotted border-stone-300 mx-1.5 hidden xs:inline-block relative -top-1" />
+                  <span className="flex-1 border-b border-dotted border-stone-300 mx-1 hidden xs:inline-block relative -top-1" />
 
                   {/* Price */}
                   <span className={`font-mono text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 ${
@@ -314,12 +342,12 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
                 </div>
 
                 {item.description && (
-                  <p className="text-[11px] text-stone-500 line-clamp-2 mt-0.5 leading-relaxed">
+                  <p className="text-[10px] sm:text-[11px] text-stone-500 line-clamp-1 sm:line-clamp-2 mt-0.5 leading-relaxed">
                     {item.description}
                   </p>
                 )}
 
-                <div className="flex items-center gap-2 mt-1 text-[10px]">
+                <div className="flex items-center gap-2 mt-0.5 text-[9px] sm:text-[10px]">
                   {item.badge && !item.isSoldOut && (
                     <span className="font-semibold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900">
                       {item.badge}
@@ -338,7 +366,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
                 </div>
               </div>
 
-              {/* 1-Tap Quick Add Button */}
+              {/* 1-Tap Quick Add Button - fixed dimensions, touch protected */}
               {!item.isSoldOut && (
                 <button
                   type="button"
@@ -350,8 +378,12 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
                       onSelectItem?.(item);
                     }
                   }}
-                  className="p-2 sm:p-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-90 text-neutral-950 font-black shadow-sm transition-all shrink-0 cursor-pointer flex items-center justify-center border border-amber-600/30"
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                  }}
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-90 text-neutral-950 font-black shadow-xs transition-all shrink-0 cursor-pointer flex items-center justify-center border border-amber-600/30 z-10"
                   title="Add directly to cart"
+                  aria-label={`Add ${item.name} to cart`}
                 >
                   <Plus className="w-4 h-4 text-neutral-950 stroke-[3]" />
                 </button>
@@ -361,7 +393,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
         )}
 
         {page.items.length > 2 && (
-          <div className="pt-1 pb-1 text-center text-[10px] text-stone-400 font-mono tracking-wide flex items-center justify-center gap-1 opacity-80 select-none">
+          <div className="pt-2 pb-1 text-center text-[10px] text-stone-400 font-mono tracking-wide flex items-center justify-center gap-1 opacity-80 select-none">
             <span>↓ Scroll to view all {page.items.length} dishes in {page.title}</span>
           </div>
         )}

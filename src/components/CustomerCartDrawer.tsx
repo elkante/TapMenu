@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   ShoppingBag,
@@ -48,6 +48,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
   const isCounterMode = (activeRestaurant as any).serviceMode === 'counter_only';
   const design = activeRestaurant.design;
   const packUnitPrice = activeRestaurant.packagingFeePerPack ?? 500;
+  const deliveryUnitPrice = activeRestaurant.deliveryFee ?? 1000;
 
   const isDelivery = topOrderMode === 'delivery';
   const isTakeout  = topOrderMode === 'takeaway' || isDelivery;
@@ -56,8 +57,9 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
   const subtotal     = cart.reduce((sum, ci) => sum + (ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1), 0);
   const effectivePacks = Math.max(packCount, 1);
   const packagingFee = isTakeout ? effectivePacks * packUnitPrice : 0;
-  const vat          = Math.round((subtotal + packagingFee) * 0.075);
-  const total        = subtotal + packagingFee + vat;
+  const deliveryFee  = isDelivery ? deliveryUnitPrice : 0;
+  const vat          = Math.round((subtotal + packagingFee + deliveryFee) * 0.075);
+  const total        = subtotal + packagingFee + deliveryFee + vat;
 
   const headerLabel =
     isDelivery              ? '🚴 Delivery Order'  :
@@ -82,6 +84,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
         orderType,
         deliveryAddress: isDelivery ? deliveryAddress : undefined,
         packagingFee: packagingFee > 0 ? packagingFee : undefined,
+        deliveryFee: deliveryFee > 0 ? deliveryFee : undefined,
         packCount: isTakeout ? effectivePacks : undefined,
       }
     );
@@ -325,10 +328,16 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                     <span>Subtotal</span>
                     <span className="font-mono">{design.currencySymbol}{subtotal.toLocaleString()}</span>
                   </div>
-                  {isTakeout && packagingFee > 0 && (
+                                    {isTakeout && packagingFee > 0 && (
                     <div className="flex justify-between text-amber-800 font-medium">
-                      <span>Packaging ({effectivePacks}× {design.currencySymbol}{packUnitPrice.toLocaleString()})</span>
+                      <span>Packaging ({effectivePacks}x {design.currencySymbol}{packUnitPrice.toLocaleString()})</span>
                       <span className="font-mono">+{design.currencySymbol}{packagingFee.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {isDelivery && deliveryFee > 0 && (
+                    <div className="flex justify-between text-blue-700 font-medium">
+                      <span>Delivery Fee</span>
+                      <span className="font-mono">+{design.currencySymbol}{deliveryFee.toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-neutral-600">
@@ -404,3 +413,4 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
     </div>
   );
 };
+
