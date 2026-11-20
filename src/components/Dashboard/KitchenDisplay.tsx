@@ -413,6 +413,7 @@ export const KitchenDisplay: React.FC<Props> = ({
 
   const currencySymbol = activeRestaurant?.design?.currencySymbol || '₦';
   const restaurantName = activeRestaurant?.name || 'Kitchen';
+  const isVendor = activeRestaurant?.serviceMode === 'counter_only' || activeRestaurant?.plan === 'vendor';
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -526,7 +527,7 @@ export const KitchenDisplay: React.FC<Props> = ({
       </header>
 
       {/* ── Waiter Call Banner (Clickable in Full) ───────────────────────────────────── */}
-      {restaurantCalls.length > 0 && (
+      {!isVendor && restaurantCalls.length > 0 && (
         <div 
           onClick={() => setViewingCallsModal(true)}
           className="bg-amber-500 text-neutral-950 px-3.5 py-2.5 flex items-center justify-between gap-3 shrink-0 cursor-pointer hover:bg-amber-400 transition-colors shadow-md animate-pulse"

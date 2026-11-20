@@ -75,9 +75,12 @@ export const RestaurantDashboard: React.FC = () => {
     showNotification 
   } = useApp();
 
+  const isVendor = activeRestaurant?.serviceMode === 'counter_only' || activeRestaurant?.plan === 'vendor';
+
   const [activeTab, setActiveTab] = useState<'kds' | 'menu' | 'inventory' | 'expenses' | 'archive' | 'tables' | 'settings'>('kds');
   const [copiedSlug, setCopiedSlug] = useState(false);
   const [tableQrMap, setTableQrMap] = useState<Record<string, string>>({});
+  const [vendorQrUrl, setVendorQrUrl] = useState<string>('');
   const [isOrderCardsOpen, setIsOrderCardsOpen] = useState(false);
   const [isMultiStoreOpen, setIsMultiStoreOpen] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
@@ -359,7 +362,9 @@ export const RestaurantDashboard: React.FC = () => {
 
   const design = activeRestaurant.design;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const customerMenuUrl = `${origin}/?r=${activeRestaurant.slug}&table=Table+1`;
+  const customerMenuUrl = isVendor 
+    ? `${origin}/?r=${activeRestaurant.slug}` 
+    : `${origin}/?r=${activeRestaurant.slug}&table=Table+1`;
 
   // ── Plan Table Limit Enforcement ─────────────────────────────────────────
   // Priority: restaurant.tableLimit (admin override) → plan.maxTables → unlimited
@@ -459,6 +464,18 @@ export const RestaurantDashboard: React.FC = () => {
     generateAllQrs();
     return () => { mounted = false; };
   }, [activeRestaurant.tables, activeRestaurant.slug, origin]);
+
+  // Generate Counter QR code for Vendor
+  useEffect(() => {
+    let mounted = true;
+    if (isVendor && activeRestaurant.slug) {
+      const directUrl = `${origin}/?r=${activeRestaurant.slug}`;
+      generateQrDataUrl(directUrl).then(qr => {
+        if (mounted) setVendorQrUrl(qr);
+      }).catch(console.warn);
+    }
+    return () => { mounted = false; };
+  }, [isVendor, activeRestaurant.slug, origin]);
 
   const handleCopyMenuLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -1081,16 +1098,18 @@ export const RestaurantDashboard: React.FC = () => {
           </nav>
 
           {/* Quick Hardware Card Order CTA in Sidebar */}
-          <div className="p-3 border-t border-neutral-800">
-            <button
-              type="button"
-              onClick={() => setIsOrderCardsOpen(true)}
-              className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-yellow-500/10 border border-amber-500/30 text-amber-300 hover:text-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-center"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Order Smart Cards</span>
-            </button>
-          </div>
+          {!isVendor && (
+            <div className="p-3 border-t border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setIsOrderCardsOpen(true)}
+                className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-yellow-500/10 border border-amber-500/30 text-amber-300 hover:text-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-center"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Order Smart Cards</span>
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* Main Body */}
@@ -1101,7 +1120,7 @@ export const RestaurantDashboard: React.FC = () => {
         {activeTab === 'kds' && (
           <div className="space-y-4">
             {/* Waiter Buzzer Banner */}
-            {restaurantCalls.length > 0 && (
+            {!isVendor && restaurantCalls.length > 0 && (
               <div className="p-4 bg-amber-500 text-neutral-950 rounded-2xl shadow flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <PhoneCall className="w-5 h-5 animate-bounce" />
@@ -1682,9 +1701,72 @@ export const RestaurantDashboard: React.FC = () => {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 3: TABLE QR CODES & PER-TABLE LINKS */}
+        {/* TAB 3: TABLE QR CODES & PER-TABLE LINKS / VENDOR COUNTER */}
         {/* ========================================================= */}
         {activeTab === 'tables' && (
+          isVendor ? (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-yellow-500/10 border border-amber-500/30 rounded-2xl p-4 sm:p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-neutral-950 font-black flex items-center justify-center shrink-0">
+                    <QrCode className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-extrabold text-neutral-900">Counter QR Code & Customer Link</h2>
+                    <p className="text-xs text-neutral-600">
+                      As a Street Vendor / Stall, your customers scan or click this single link to order directly to your counter for pickup or delivery.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-neutral-200 p-6 flex flex-col items-center max-w-md mx-auto text-center shadow-xs">
+                {vendorQrUrl ? (
+                  <img src={vendorQrUrl} alt="Vendor QR Code" className="w-56 h-56 rounded-xl border border-neutral-200 shadow-sm mb-4" />
+                ) : (
+                  <div className="w-56 h-56 rounded-xl bg-neutral-100 flex items-center justify-center text-xs text-neutral-400 mb-4 animate-pulse">
+                    Generating QR Code...
+                  </div>
+                )}
+
+                <h3 className="font-bold text-neutral-900 text-sm mb-1">{activeRestaurant.name}</h3>
+                <p className="text-xs text-neutral-500 font-mono mb-4 break-all px-2">
+                  {origin}/?r={activeRestaurant.slug}
+                </p>
+
+                <div className="flex flex-wrap gap-2 justify-center w-full">
+                  <button
+                    onClick={() => handleCopyMenuLink(`${origin}/?r=${activeRestaurant.slug}`)}
+                    className="flex-1 py-2.5 px-3 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{copiedSlug ? 'Copied!' : 'Copy Link'}</span>
+                  </button>
+
+                  {vendorQrUrl && (
+                    <a
+                      href={vendorQrUrl}
+                      download={`${activeRestaurant.slug}-counter-qr.png`}
+                      className="flex-1 py-2.5 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                    >
+                      <Upload className="w-3.5 h-3.5 rotate-180" />
+                      <span>Download QR</span>
+                    </a>
+                  )}
+
+                  <a
+                    href={`${origin}/?r=${activeRestaurant.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-2 px-3 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open Customer Menu in New Tab</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -1884,7 +1966,8 @@ export const RestaurantDashboard: React.FC = () => {
               })}
             </div>
           </div>
-        )}
+        )
+      )}
 
         {/* ========================================================= */}
         {/* TAB: KITCHEN INVENTORY MANAGER */}
@@ -2133,41 +2216,55 @@ export const RestaurantDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* ── Service Mode (Counter / Street Vendor) ── */}
+              {/* ── Service Mode ── */}
               <div>
                 <label className="block font-bold text-neutral-600 mb-1">Service Mode</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateRestaurantMeta({ serviceMode: 'table_service' } as any)}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      (activeRestaurant as any).serviceMode !== 'counter_only'
-                        ? 'border-neutral-900 bg-neutral-900 text-white'
-                        : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-400'
-                    }`}
-                  >
-                    <div className="text-base mb-0.5">🍽️</div>
-                    <div className="font-bold text-xs">Table Service</div>
-                    <div className="text-[10px] opacity-70">Multiple tables, waiter calls, QR per table</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateRestaurantMeta({ serviceMode: 'counter_only' } as any)}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      (activeRestaurant as any).serviceMode === 'counter_only'
-                        ? 'border-amber-500 bg-amber-500 text-white'
-                        : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-amber-300'
-                    }`}
-                  >
-                    <div className="text-base mb-0.5">⚡</div>
-                    <div className="font-bold text-xs">Counter / Street Vendor</div>
-                    <div className="text-[10px] opacity-70">Single QR link, all orders go to counter</div>
-                  </button>
-                </div>
-                {(activeRestaurant as any).serviceMode === 'counter_only' && (
-                  <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900">
-                    ⚡ <strong>Counter mode active.</strong> Share your menu link <span className="font-mono bg-amber-100 px-1 rounded">/?r={activeRestaurant.slug}</span> — no table selection needed. All orders go straight to the kitchen.
+                {isVendor ? (
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">⚡</span>
+                      <span className="font-bold text-xs text-amber-900">Counter / Street Vendor Mode</span>
+                    </div>
+                    <p className="text-[11px] text-amber-700 leading-relaxed">
+                      Your orders go directly to your kitchen display for pickup or delivery. Full table management with QR per table is reserved for Restaurant accounts.
+                    </p>
                   </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateRestaurantMeta({ serviceMode: 'table_service' } as any)}
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${
+                          (activeRestaurant as any).serviceMode !== 'counter_only'
+                            ? 'border-neutral-900 bg-neutral-900 text-white'
+                            : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-400'
+                        }`}
+                      >
+                        <div className="text-base mb-0.5">🍽️</div>
+                        <div className="font-bold text-xs">Table Service</div>
+                        <div className="text-[10px] opacity-70">Multiple tables, waiter calls, QR per table</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateRestaurantMeta({ serviceMode: 'counter_only' } as any)}
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${
+                          (activeRestaurant as any).serviceMode === 'counter_only'
+                            ? 'border-amber-500 bg-amber-500 text-white'
+                            : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-amber-300'
+                        }`}
+                      >
+                        <div className="text-base mb-0.5">⚡</div>
+                        <div className="font-bold text-xs">Counter Mode</div>
+                        <div className="text-[10px] opacity-70">Single QR link, all orders go to counter</div>
+                      </button>
+                    </div>
+                    {(activeRestaurant as any).serviceMode === 'counter_only' && (
+                      <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900">
+                        ⚡ <strong>Counter mode active.</strong> Share your menu link <span className="font-mono bg-amber-100 px-1 rounded">/?r={activeRestaurant.slug}</span> — no table selection needed. All orders go straight to the kitchen.
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -2791,14 +2888,16 @@ export const RestaurantDashboard: React.FC = () => {
 
             {/* Bottom Actions inside Drawer (Safe pb-24 clearance above bottom navigation) */}
             <div className="p-3 pb-24 border-t border-neutral-800 space-y-2 bg-neutral-900/95 backdrop-blur-sm shrink-0">
-              <button
-                type="button"
-                onClick={() => { setIsOrderCardsOpen(true); setIsMobileDrawerOpen(false); }}
-                className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-yellow-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-center cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Order Smart Cards</span>
-              </button>
+              {!isVendor && (
+                <button
+                  type="button"
+                  onClick={() => { setIsOrderCardsOpen(true); setIsMobileDrawerOpen(false); }}
+                  className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-yellow-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-center cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Order Smart Cards</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -2819,11 +2918,12 @@ export const RestaurantDashboard: React.FC = () => {
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
         activeOrdersCount={activeOrders.length}
-        waiterCallsCount={restaurantCalls.length}
+        waiterCallsCount={isVendor ? 0 : restaurantCalls.length}
         totalDishesCount={allDishes.length}
-        totalTablesCount={(activeRestaurant?.tables || []).length}
+        totalTablesCount={isVendor ? 0 : (activeRestaurant?.tables || []).length}
         isTestingChime={testingChime}
         onTestChime={handleTestChime}
+        isVendor={isVendor}
       />
     </div>
   );

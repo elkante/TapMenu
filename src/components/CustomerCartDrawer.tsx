@@ -50,7 +50,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
 
   if (!isOpen) return null;
 
-  const isCounterMode = (activeRestaurant as any).serviceMode === 'counter_only';
+  const isCounterMode = (activeRestaurant as any).serviceMode === 'counter_only' || (activeRestaurant as any).plan === 'vendor';
   const design = activeRestaurant.design;
   const packUnitPrice = activeRestaurant.packagingFeePerPack ?? 500;
   const deliveryUnitPrice = activeRestaurant.deliveryFee ?? 1000;

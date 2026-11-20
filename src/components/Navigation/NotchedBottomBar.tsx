@@ -45,6 +45,7 @@ export interface KitchenDashboardNotchedBarProps {
   totalTablesCount: number;
   isTestingChime?: boolean;
   onTestChime: () => void;
+  isVendor?: boolean;
 }
 
 export interface SuperAdminNotchedBarProps {
@@ -324,7 +325,7 @@ export const NotchedBottomBar: React.FC<NotchedBottomBarProps> = (props) => {
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] tracking-tight mt-0.5">Tables</span>
+                <span className="text-[10px] tracking-tight mt-0.5">{props.isVendor ? 'QR Code' : 'Tables'}</span>
               </button>
 
               {/* Dashboard Tab 4: Settings & Day Shift */}
