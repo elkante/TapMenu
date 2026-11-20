@@ -152,9 +152,13 @@ const MainContent: React.FC = () => {
         onOpenWaiterModal={() => setWaiterModalOpen(true)}
       />
 
-      {/* Customer View: Pure Authentic Luxury Flipbook Menu */}
+      {/* Customer View: Flipbook or Fast Scroll Quick Menu */}
       <main className="flex-1 w-full max-w-full overflow-x-hidden">
-        <FlipbookViewer />
+        {currentView === 'quick' ? (
+          <QuickMenuView onSelectItem={handleOpenItem} />
+        ) : (
+          <FlipbookViewer />
+        )}
       </main>
 
       {/* Customer Slide-Over Cart Drawer */}

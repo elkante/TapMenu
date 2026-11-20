@@ -497,6 +497,18 @@ export const RestaurantDashboard: React.FC = () => {
     }
   };
 
+  const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      updateRestaurantMeta({ coverImage: dataUrl } as any);
+      showNotification('Menu cover photo updated!');
+    } catch {
+      showNotification('Failed to read image file');
+    }
+  };
+
   const contentPages = activeRestaurant.pages.filter(p => p.layout !== 'cover');
 
   const handleCreateCategory = (e: React.FormEvent) => {
@@ -2004,6 +2016,77 @@ export const RestaurantDashboard: React.FC = () => {
                   onChange={(e) => updateRestaurantMeta({ phone: e.target.value })}
                   className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:border-neutral-900"
                 />
+              </div>
+
+              {/* ── Menu Cover Photo ── */}
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Menu Cover Background Photo</label>
+                <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl space-y-2">
+                  {(activeRestaurant as any).coverImage ? (
+                    <div className="relative w-full h-28 rounded-xl overflow-hidden border border-neutral-300 shadow-xs">
+                      <img src={(activeRestaurant as any).coverImage} alt="Cover" className="w-full h-full object-cover" />
+                      <div className="absolute top-2 right-2 flex gap-1.5">
+                        <label className="p-1.5 bg-neutral-900/80 hover:bg-neutral-900 text-white rounded-lg cursor-pointer transition-colors" title="Change photo">
+                          <Upload className="w-3.5 h-3.5" />
+                          <input type="file" accept="image/*" onChange={handleCoverImageUpload} className="hidden" />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => updateRestaurantMeta({ coverImage: '' } as any)}
+                          className="p-1.5 bg-red-600/90 hover:bg-red-600 text-white rounded-lg transition-colors"
+                          title="Remove cover photo"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center gap-1.5 p-4 border-2 border-dashed border-neutral-200 hover:border-amber-500 rounded-xl cursor-pointer bg-white transition-colors">
+                      <Upload className="w-5 h-5 text-neutral-400" />
+                      <span className="font-bold text-neutral-700">Upload Cover Photo</span>
+                      <span className="text-[10px] text-neutral-400 text-center">Shows as background on the flipbook cover page</span>
+                      <input type="file" accept="image/*" onChange={handleCoverImageUpload} className="hidden" />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Service Mode (Counter / Street Vendor) ── */}
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Service Mode</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateRestaurantMeta({ serviceMode: 'table_service' } as any)}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      (activeRestaurant as any).serviceMode !== 'counter_only'
+                        ? 'border-neutral-900 bg-neutral-900 text-white'
+                        : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-400'
+                    }`}
+                  >
+                    <div className="text-base mb-0.5">🍽️</div>
+                    <div className="font-bold text-xs">Table Service</div>
+                    <div className="text-[10px] opacity-70">Multiple tables, waiter calls, QR per table</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateRestaurantMeta({ serviceMode: 'counter_only' } as any)}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      (activeRestaurant as any).serviceMode === 'counter_only'
+                        ? 'border-amber-500 bg-amber-500 text-white'
+                        : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-amber-300'
+                    }`}
+                  >
+                    <div className="text-base mb-0.5">⚡</div>
+                    <div className="font-bold text-xs">Counter / Street Vendor</div>
+                    <div className="text-[10px] opacity-70">Single QR link, all orders go to counter</div>
+                  </button>
+                </div>
+                {(activeRestaurant as any).serviceMode === 'counter_only' && (
+                  <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900">
+                    ⚡ <strong>Counter mode active.</strong> Share your menu link <span className="font-mono bg-amber-100 px-1 rounded">/?r={activeRestaurant.slug}</span> — no table selection needed. All orders go straight to the kitchen.
+                  </div>
+                )}
               </div>
 
               {/* Account & Session Management */}

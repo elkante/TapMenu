@@ -111,6 +111,8 @@ export interface RestaurantTenant {
   quickMenuEnabled: boolean;
   allowOrdering: boolean;
   tableOrderingEnabled: boolean;
+  /** Service Mode: Full table service or single counter/street vendor kiosk */
+  serviceMode?: 'table_service' | 'counter_only';
   /** Takeout pack charge per item or per order (default ₦500) */
   packagingFeePerPack?: number;
   /** Subscription & Billing Tracking */
@@ -148,10 +150,11 @@ export interface Order {
   createdAt: string;
   createdAtTimestamp?: number;
   source: 'nfc' | 'qr' | 'web';
-  /** Takeout packaging options */
-  orderType?: 'dine_in' | 'takeaway' | 'both';
+  /** Takeout / Delivery packaging options */
+  orderType?: 'dine_in' | 'takeaway' | 'both' | 'delivery';
   packagingFee?: number;
   packCount?: number;
+  deliveryAddress?: string;
 }
 
 export interface InventoryItem {

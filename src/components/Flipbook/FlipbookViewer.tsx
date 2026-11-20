@@ -222,7 +222,7 @@ export const FlipbookViewer: React.FC = () => {
 
             {/* Layered Paper Stack Edge (Bottom & Right) to give true 3D book thickness */}
             <div 
-              className="w-full h-[490px] xs:h-[550px] sm:h-[620px] relative rounded-2xl bg-[#FAF7F2]"
+              className="w-full h-[530px] xs:h-[580px] sm:h-[650px] max-h-[82vh] relative rounded-2xl bg-[#FAF7F2]"
               style={{
                 boxShadow: `${Math.min(4, Math.max(1, Math.ceil((pages.length - 1 - currentPageIndex) / 2))) >= 1 ? '2px 2px 0 #ede8db, ' : ''}${Math.min(4, Math.max(1, Math.ceil((pages.length - 1 - currentPageIndex) / 2))) >= 2 ? '4px 4px 0 #e0d9c8, ' : ''}${Math.min(4, Math.max(1, Math.ceil((pages.length - 1 - currentPageIndex) / 2))) >= 3 ? '6px 6px 0 #d5ccb8, ' : ''}${Math.min(4, Math.max(1, Math.ceil((pages.length - 1 - currentPageIndex) / 2))) >= 4 ? '8px 8px 0 #c8bfa7, ' : ''}12px 14px 28px rgba(0,0,0,0.55)`,
                 perspective: '2200px',
@@ -248,14 +248,18 @@ export const FlipbookViewer: React.FC = () => {
                   <FlipPageRenderer
                     page={currentPage}
                     design={design}
-                    restaurantName={activeRestaurant.name}
-                    restaurantLogo={activeRestaurant.logo}
-                    restaurantTagline={activeRestaurant.tagline}
-                    restaurantHours={activeRestaurant.openingHours}
-                    restaurantAddress={activeRestaurant.address}
+                    restaurantName={activeRestaurant?.name || 'Restaurant'}
+                    restaurantLogo={activeRestaurant?.logo}
+                    restaurantTagline={activeRestaurant?.tagline}
+                    restaurantHours={activeRestaurant?.openingHours}
+                    restaurantAddress={activeRestaurant?.address}
                     isCover={currentPageIndex === 0 || currentPage.layout === 'cover'}
+                    coverImage={activeRestaurant?.coverImage || currentPage.backgroundImage}
                     onSelectItem={(it) => {
                       if (!it.isSoldOut) setSelectedItem(it);
+                    }}
+                    onAddToCart={(it) => {
+                      if (!it.isSoldOut) addToCart(it);
                     }}
                     pageNumberDisplay={currentPageIndex + 1}
                   />
@@ -268,12 +272,13 @@ export const FlipbookViewer: React.FC = () => {
                     <FlipPageRenderer
                       page={flipDirection === 'next' ? (pages[targetPageIndex ?? 0] || currentPage) : (pages[fromPageIndex ?? 0] || currentPage)}
                       design={design}
-                      restaurantName={activeRestaurant.name}
-                      restaurantLogo={activeRestaurant.logo}
-                      restaurantTagline={activeRestaurant.tagline}
-                      restaurantHours={activeRestaurant.openingHours}
-                      restaurantAddress={activeRestaurant.address}
+                      restaurantName={activeRestaurant?.name || 'Restaurant'}
+                      restaurantLogo={activeRestaurant?.logo}
+                      restaurantTagline={activeRestaurant?.tagline}
+                      restaurantHours={activeRestaurant?.openingHours}
+                      restaurantAddress={activeRestaurant?.address}
                       isCover={(flipDirection === 'next' ? targetPageIndex : fromPageIndex) === 0 || (pages[flipDirection === 'next' ? (targetPageIndex ?? 0) : (fromPageIndex ?? 0)]?.layout === 'cover')}
+                      coverImage={activeRestaurant?.coverImage || pages[flipDirection === 'next' ? (targetPageIndex ?? 0) : (fromPageIndex ?? 0)]?.backgroundImage}
                       pageNumberDisplay={(flipDirection === 'next' ? (targetPageIndex ?? 0) : (fromPageIndex ?? 0)) + 1}
                     />
                     {/* Shadow cast on the revealed page while turning leaf is overhead */}
@@ -289,12 +294,13 @@ export const FlipbookViewer: React.FC = () => {
                     <FlipPageRenderer
                       page={flipDirection === 'next' ? (pages[fromPageIndex ?? 0] || currentPage) : (pages[targetPageIndex ?? 0] || currentPage)}
                       design={design}
-                      restaurantName={activeRestaurant.name}
-                      restaurantLogo={activeRestaurant.logo}
-                      restaurantTagline={activeRestaurant.tagline}
-                      restaurantHours={activeRestaurant.openingHours}
-                      restaurantAddress={activeRestaurant.address}
+                      restaurantName={activeRestaurant?.name || 'Restaurant'}
+                      restaurantLogo={activeRestaurant?.logo}
+                      restaurantTagline={activeRestaurant?.tagline}
+                      restaurantHours={activeRestaurant?.openingHours}
+                      restaurantAddress={activeRestaurant?.address}
                       isCover={(flipDirection === 'next' ? fromPageIndex : targetPageIndex) === 0 || (pages[flipDirection === 'next' ? (fromPageIndex ?? 0) : (targetPageIndex ?? 0)]?.layout === 'cover')}
+                      coverImage={activeRestaurant?.coverImage || pages[flipDirection === 'next' ? (fromPageIndex ?? 0) : (targetPageIndex ?? 0)]?.backgroundImage}
                       pageNumberDisplay={(flipDirection === 'next' ? (fromPageIndex ?? 0) : (targetPageIndex ?? 0)) + 1}
                     />
                     {/* Dynamic cylindrical reflection and crease highlight across turning paper */}

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { 
   RestaurantTenant, 
   MenuBookDesign, 
@@ -94,6 +94,8 @@ interface AppContextType {
   addToCart: (item: FoodItem, notes?: string, qty?: number) => void;
   updateCartItemQuantity: (index: number, quantity: number) => void;
   updateCartItemType: (index: number, itemType: 'dine_in' | 'takeaway') => void;
+  updateCartItemNotes: (index: number, notes: string) => void;
+  setAllCartItemsType: (itemType: 'dine_in' | 'takeaway') => void;
   removeFromCart: (index: number) => void;
   clearCart: () => void;
   placeOrder: (
@@ -103,9 +105,10 @@ interface AppContextType {
       customerPhone?: string; 
       subtotal?: number; 
       vat?: number;
-      orderType?: 'dine_in' | 'takeaway' | 'both';
+      orderType?: 'dine_in' | 'takeaway' | 'both' | 'delivery';
       packagingFee?: number;
       packCount?: number;
+      deliveryAddress?: string;
     }
   ) => Order | null;
   callWaiter: (reason: WaiterCall['reason']) => void;
@@ -127,7 +130,7 @@ const EMPTY_RESTAURANT: RestaurantTenant = {
   slug: '',
   name: 'Restaurant Menu',
   tagline: 'Kitchen & Bar',
-  logo: '🛡️',
+  logo: 'ðŸ›¡ï¸',
   coverImage: '',
   address: '',
   phone: '',
@@ -150,7 +153,7 @@ const EMPTY_RESTAURANT: RestaurantTenant = {
     showPageNumbers: true,
     enableAudioEffect: true,
     showPriceSymbols: true,
-    currencySymbol: '₦',
+    currencySymbol: 'â‚¦',
   },
   tables: [],
   pages: []
@@ -391,7 +394,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       if (match) return match;
 
-      // ── Instant Customer View (0ms feedback) ──
+      // â”€â”€ Instant Customer View (0ms feedback) â”€â”€
       // Derive restaurant name immediately from URL slug so customer sees the restaurant name at 0ms!
       const humanizedName = requestedSlug
         .split(/[-_+]+/)
@@ -405,7 +408,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         slug: requestedSlug,
         name: humanizedName || 'Restaurant Menu',
         tagline: 'Fresh Kitchen & Bar',
-        logo: '🍽️',
+        logo: 'ðŸ½ï¸',
         pages: []
       };
     }
@@ -466,7 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setOrders(prev => {
               if (prev.some(o => o.id === order.id)) return prev;
               triggerKitchenAlert({
-                title: `🍽️ New Order (Table ${order.tableNumber})`,
+                title: `ðŸ½ï¸ New Order (Table ${order.tableNumber})`,
                 body: (order.items || []).map((i: any) => `${i?.quantity || 1}x ${i?.foodItem?.name || i?.name || 'Item'}`).join(', '),
                 type: 'order',
                 tableNumber: order.tableNumber,
@@ -479,7 +482,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setWaiterCalls(prev => {
               if (prev.some(c => c.id === call.id)) return prev;
               triggerKitchenAlert({
-                title: `🛎️ Table ${call.tableNumber} Calling Waiter!`,
+                title: `ðŸ›Žï¸ Table ${call.tableNumber} Calling Waiter!`,
                 body: `Table ${call.tableNumber} requested assistance (${call.reason || 'Service'}).`,
                 type: 'waiter',
                 tableNumber: call.tableNumber,
@@ -550,6 +553,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         supabaseChannel = supabase
           .channel(`kds-sync-${targetRestId}`)
+          .on(
+            'broadcast',
+            { event: 'NEW_ORDER' },
+            ({ payload }: any) => {
+              if (!isMounted || !payload) return;
+              const incoming = payload;
+              setOrders(prev => {
+                if (prev.some(o => o.id === incoming.id)) return prev;
+                triggerKitchenAlert({
+                  title: `ðŸ½ï¸ New Order (${incoming.tableNumber || 'Table'})`,
+                  body: (incoming.items || []).map((i: any) => `${i?.quantity || 1}x ${i?.foodItem?.name || i?.name || 'Item'}`).join(', '),
+                  type: 'order',
+                  tableNumber: incoming.tableNumber,
+                });
+                return [incoming, ...prev];
+              });
+            }
+          )
+          .on(
+            'broadcast',
+            { event: 'NEW_WAITER_CALL' },
+            ({ payload }: any) => {
+              if (!isMounted || !payload) return;
+              const incoming = payload;
+              setWaiterCalls(prev => {
+                if (prev.some(c => c.id === incoming.id)) return prev;
+                triggerKitchenAlert({
+                  title: `ðŸ›Žï¸ Table ${incoming.tableNumber} Calling Waiter!`,
+                  body: `Table ${incoming.tableNumber} requested assistance (${incoming.reason || 'Service'}).`,
+                  type: 'waiter',
+                  tableNumber: incoming.tableNumber,
+                });
+                return [incoming, ...prev];
+              });
+            }
+          )
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'restaurants' },
@@ -636,7 +675,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setOrders(prev => {
                   if (prev.some(o => o.id === mapped.id)) return prev;
                   triggerKitchenAlert({
-                    title: `🍽️ New Order (Table ${mapped.tableNumber})`,
+                    title: `ðŸ½ï¸ New Order (Table ${mapped.tableNumber})`,
                     body: (mapped.items || []).map((i: any) => `${i?.quantity || 1}x ${i?.foodItem?.name || i?.name || 'Item'}`).join(', '),
                     type: 'order',
                     tableNumber: mapped.tableNumber,
@@ -673,7 +712,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setWaiterCalls(prev => {
                   if (prev.some(c => c.id === mapped.id)) return prev;
                   triggerKitchenAlert({
-                    title: `🛎️ Table ${mapped.tableNumber} Calling Waiter!`,
+                    title: `ðŸ›Žï¸ Table ${mapped.tableNumber} Calling Waiter!`,
                     body: `Table ${mapped.tableNumber} requested assistance (${mapped.reason || 'Service'}).`,
                     type: 'waiter',
                     tableNumber: mapped.tableNumber,
@@ -698,7 +737,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const matchesRest = row.restaurant_id === targetRestId || (targetSlug && row.restaurant_id === targetSlug);
               if (!matchesRest) return;
 
-              // Use the payload directly — no re-fetch of the entire restaurant
+              // Use the payload directly â€” no re-fetch of the entire restaurant
               if (payload.eventType === 'INSERT' && payload.new) {
                 const item = payload.new;
                 setRestaurants(prev => prev.map(r => {
@@ -1165,7 +1204,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (target) {
       const maxTables = getTenantMaxTables(target);
       if (maxTables !== null && target.tables.length >= maxTables) {
-        showNotification(`🚫 Table limit reached (${maxTables} max). Upgrade your plan or contact admin.`);
+        showNotification(`ðŸš« Table limit reached (${maxTables} max). Upgrade your plan or contact admin.`);
         return;
       }
     }
@@ -1249,7 +1288,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const existing = r.tables.length;
 
         if (maxTables !== null && existing >= maxTables) {
-          showNotification(`🚫 Table limit reached (${maxTables} max). Upgrade your plan or contact admin.`);
+          showNotification(`ðŸš« Table limit reached (${maxTables} max). Upgrade your plan or contact admin.`);
           return r;
         }
 
@@ -1310,7 +1349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentTable(tableNumber);
     setIsNfcSource(true);
     setCurrentView('flipbook');
-    showNotification(`⚡ Smart Card tapped for ${tableNumber}`);
+    showNotification(`âš¡ Smart Card tapped for ${tableNumber}`);
   };
 
   // Cart & Ordering
@@ -1346,6 +1385,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCart(prev => prev.map((ci, idx) => idx === index ? { ...ci, itemType } : ci));
   };
 
+  const updateCartItemNotes = (index: number, notes: string) => {
+    setCart(prev => prev.map((ci, idx) => idx === index ? { ...ci, notes } : ci));
+  };
+
+  const setAllCartItemsType = (itemType: 'dine_in' | 'takeaway') => {
+    setCart(prev => prev.map(ci => ({ ...ci, itemType })));
+  };
+
   const removeFromCart = (index: number) => {
     setCart(prev => prev.filter((_, i) => i !== index));
   };
@@ -1361,22 +1408,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customerPhone?: string; 
       subtotal?: number; 
       vat?: number;
-      orderType?: 'dine_in' | 'takeaway' | 'both';
+      orderType?: 'dine_in' | 'takeaway' | 'both' | 'delivery';
       packagingFee?: number;
       packCount?: number;
+      deliveryAddress?: string;
     }
   ): Order | null => {
     if (cart.length === 0) return null;
 
-    const calcSubtotal = extraDetails?.subtotal ?? cart.reduce((sum, ci) => sum + ci.foodItem.price * ci.quantity, 0);
+    const calcSubtotal = extraDetails?.subtotal ?? cart.reduce((sum, ci) => sum + (ci.foodItem?.price ?? (ci as any).price ?? 0) * ci.quantity, 0);
     const packagingFee = extraDetails?.packagingFee ?? 0;
     const calcVat = extraDetails?.vat ?? Math.round((calcSubtotal + packagingFee) * 0.075);
     const total = calcSubtotal + packagingFee + calcVat;
     const orderType = extraDetails?.orderType || 'dine_in';
-    // For 'both' and 'dine_in', always keep the table; for pure takeaway show "Takeout (TableNum)"
-    const orderTable = orderType === 'takeaway'
-      ? `Takeout (${currentTable || 'Walk-in'})`
-      : (currentTable || 'Table 1');
+    const isCounterMode = activeRestaurant.serviceMode === 'counter_only';
+
+    // Format table number / destination
+    let orderTable = currentTable || 'Table 1';
+    if (orderType === 'delivery') {
+      orderTable = 'ðŸ›µ Delivery';
+    } else if (orderType === 'takeaway') {
+      orderTable = isCounterMode ? 'âš¡ Counter Takeaway' : `Takeout (${currentTable || 'Walk-in'})`;
+    } else if (isCounterMode) {
+      orderTable = 'âš¡ Walk-up Counter';
+    }
 
     let targetRestaurantId = activeRestaurant.id;
     if (!targetRestaurantId && requestedSlug) {
@@ -1395,7 +1450,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: uniqueId,
       restaurantId: targetRestaurantId,
       tableNumber: orderTable,
-      customerName: customerName.trim() || (orderType === 'takeaway' ? `Takeout Customer (${currentTable || 'Walk-in'})` : `Diner at ${orderTable}`),
+      customerName: customerName.trim() || (orderType === 'takeaway' ? `Takeout Customer` : orderType === 'delivery' ? `Delivery Customer` : `Diner at ${orderTable}`),
       customerPhone: extraDetails?.customerPhone?.trim() || undefined,
       items: [...cart],
       subtotal: calcSubtotal,
@@ -1408,14 +1463,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       source: isNfcSource ? 'nfc' : 'qr',
       orderType,
       packagingFee: packagingFee > 0 ? packagingFee : undefined,
-      packCount: extraDetails?.packCount
+      packCount: extraDetails?.packCount,
+      deliveryAddress: extraDetails?.deliveryAddress?.trim() || undefined
     };
 
     setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
     clearCart();
     playKitchenChime();
 
-    // Broadcast cross-tab instantly
+    // 1. Same-browser BroadcastChannel (0ms)
     try {
       if (typeof BroadcastChannel !== 'undefined') {
         const bc = new BroadcastChannel('tapmenu_live_sync');
@@ -1424,10 +1480,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch {}
 
-    // Persist to Supabase
+    // 2. Supabase Realtime WebSocket broadcast for cross-device instant delivery (<50ms!)
+    try {
+      if (supabase && targetRestaurantId) {
+        const chan = supabase.channel(`kds-sync-${targetRestaurantId}`);
+        chan.send({
+          type: 'broadcast',
+          event: 'NEW_ORDER',
+          payload: newOrder
+        });
+        if (activeRestaurant.slug && activeRestaurant.slug !== targetRestaurantId) {
+          const slugChan = supabase.channel(`kds-sync-${activeRestaurant.slug}`);
+          slugChan.send({
+            type: 'broadcast',
+            event: 'NEW_ORDER',
+            payload: newOrder
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Realtime instant broadcast error:', e);
+    }
+
+    // 3. Database persistence in background
     syncOrderToSupabase(newOrder);
 
-    showNotification(`🎉 Order sent to ${activeRestaurant.name || 'kitchen'} from ${orderTable}!`);
+    showNotification(`ðŸŽ‰ Order sent to ${activeRestaurant.name || 'kitchen'} from ${orderTable}!`);
     return newOrder;
   };
 
@@ -1463,8 +1541,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch {}
 
+    // Instant WebSocket broadcast for waiter buzzer
+    try {
+      if (supabase && targetRestaurantId) {
+        const chan = supabase.channel(`kds-sync-${targetRestaurantId}`);
+        chan.send({
+          type: 'broadcast',
+          event: 'NEW_WAITER_CALL',
+          payload: newCall
+        });
+      }
+    } catch {}
+
     syncWaiterCallToSupabase(newCall);
-    showNotification(`🔔 Waiter buzzed for ${tableNum}: ${reason}`);
+    showNotification(`ðŸ”” Waiter buzzed for ${tableNum}: ${reason}`);
   };
 
   const resolveWaiterCall = (id: string) => {
@@ -1555,6 +1645,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addToCart,
         updateCartItemQuantity,
         updateCartItemType,
+        updateCartItemNotes,
+        setAllCartItemsType,
         removeFromCart,
         clearCart,
         placeOrder,

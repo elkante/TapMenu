@@ -43,7 +43,9 @@ interface FlipPageRendererProps {
   restaurantHours?: string;
   restaurantAddress?: string;
   isCover?: boolean;
+  coverImage?: string;
   onSelectItem?: (item: FoodItem) => void;
+  onAddToCart?: (item: FoodItem, e: React.MouseEvent) => void;
   pageNumberDisplay?: string | number;
 }
 
@@ -56,7 +58,9 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
   restaurantHours,
   restaurantAddress,
   isCover = false,
+  coverImage,
   onSelectItem,
+  onAddToCart,
   pageNumberDisplay,
 }) => {
   const coverThemeColor = design.coverColor || design.primaryColor || '#0c2e22';
@@ -99,6 +103,8 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
       restaurantLogo.startsWith('/')
     );
 
+    const effectiveCover = coverImage || page.backgroundImage;
+
     return (
       <div 
         className="w-full h-full relative flex flex-col justify-between overflow-hidden select-none"
@@ -107,13 +113,24 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
           boxShadow: 'inset 0 0 50px rgba(0,0,0,0.6)'
         }}
       >
-        {/* Subtle leather texture overlay */}
-        <div 
-          className="absolute inset-0 pointer-events-none opacity-20"
-          style={{
-            backgroundImage: 'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.4) 100%)'
-          }}
-        />
+        {/* Cover Photo / Background Image if uploaded */}
+        {effectiveCover ? (
+          <div 
+            className="absolute inset-0 bg-cover bg-center pointer-events-none transition-all duration-300"
+            style={{ 
+              backgroundImage: `url(${effectiveCover})`,
+              filter: 'brightness(0.45) contrast(1.15) saturate(1.1)'
+            }}
+          />
+        ) : (
+          /* Subtle leather texture overlay */
+          <div 
+            className="absolute inset-0 pointer-events-none opacity-20"
+            style={{
+              backgroundImage: 'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.4) 100%)'
+            }}
+          />
+        )}
 
         {/* Book Spine Crease & 3D Shadow on Left */}
         <div 
@@ -321,18 +338,32 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
                 </div>
               </div>
 
-              {/* Add Button */}
+              {/* 1-Tap Quick Add Button */}
               {!item.isSoldOut && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onSelectItem?.(item); }}
-                  className="p-1.5 rounded-lg bg-amber-100/80 hover:bg-amber-200 text-amber-900 transition-colors shrink-0"
-                  title="Add to order"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onAddToCart) {
+                      onAddToCart(item, e);
+                    } else {
+                      onSelectItem?.(item);
+                    }
+                  }}
+                  className="p-2 sm:p-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-90 text-neutral-950 font-black shadow-sm transition-all shrink-0 cursor-pointer flex items-center justify-center border border-amber-600/30"
+                  title="Add directly to cart"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-4 h-4 text-neutral-950 stroke-[3]" />
                 </button>
               )}
             </div>
           ))
+        )}
+
+        {page.items.length > 2 && (
+          <div className="pt-1 pb-1 text-center text-[10px] text-stone-400 font-mono tracking-wide flex items-center justify-center gap-1 opacity-80 select-none">
+            <span>↓ Scroll to view all {page.items.length} dishes in {page.title}</span>
+          </div>
         )}
       </div>
 

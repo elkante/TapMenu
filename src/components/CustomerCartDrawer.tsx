@@ -12,7 +12,10 @@ import {
   Minus,
   Building2,
   UtensilsCrossed,
-  Package
+  Package,
+  Zap,
+  MapPin,
+  Bike
 } from 'lucide-react';
 
 export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -20,6 +23,8 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
     cart,
     updateCartItemQuantity,
     updateCartItemType,
+    updateCartItemNotes,
+    setAllCartItemsType,
     removeFromCart,
     placeOrder,
     activeRestaurant,
@@ -32,37 +37,40 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
   const [packCount, setPackCount] = useState(1);
   const [paymentChoice, setPaymentChoice] = useState<'pos' | 'cash' | 'transfer'>('pos');
   const [orderPlacedSuccess, setOrderPlacedSuccess] = useState<string | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  // Top-level order mode — the most visible choice the customer makes
+  const [topOrderMode, setTopOrderMode] = useState<'dine_in' | 'takeaway' | 'delivery'>(
+    () => !currentTable ? 'takeaway' : 'dine_in'
+  );
 
   if (!isOpen) return null;
 
+  const isCounterMode = (activeRestaurant as any).serviceMode === 'counter_only';
   const design = activeRestaurant.design;
   const packUnitPrice = activeRestaurant.packagingFeePerPack ?? 500;
 
-  // Derive order type from the items themselves
-  const hasDineIn  = cart.some(ci => !ci.itemType || ci.itemType === 'dine_in');
-  const hasTakeout = cart.some(ci => ci.itemType === 'takeaway');
-  const orderType  = hasDineIn && hasTakeout ? 'both' : hasTakeout ? 'takeaway' : 'dine_in';
+  const isDelivery = topOrderMode === 'delivery';
+  const isTakeout  = topOrderMode === 'takeaway' || isDelivery;
+  const orderType  = isDelivery ? 'delivery' : isTakeout ? 'takeaway' : 'dine_in';
 
-  const subtotal      = cart.reduce((sum, ci) => sum + (ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1), 0);
-  const takeoutCount  = cart.filter(ci => ci.itemType === 'takeaway').reduce((s, ci) => s + ci.quantity, 0);
-  // Auto-set pack count to match takeout item count (user can adjust)
+  const subtotal     = cart.reduce((sum, ci) => sum + (ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1), 0);
   const effectivePacks = Math.max(packCount, 1);
-  const packagingFee  = hasTakeout ? effectivePacks * packUnitPrice : 0;
-  const vat           = Math.round((subtotal + packagingFee) * 0.075);
-  const total         = subtotal + packagingFee + vat;
+  const packagingFee = isTakeout ? effectivePacks * packUnitPrice : 0;
+  const vat          = Math.round((subtotal + packagingFee) * 0.075);
+  const total        = subtotal + packagingFee + vat;
 
-  // Header label
   const headerLabel =
-    orderType === 'both'     ? '🍽️🥡 Dine-in + Takeout' :
-    orderType === 'takeaway' ? '🥡 Takeout Order'        :
-                               '🍽️ Dine-in Order';
+    isDelivery              ? '🚴 Delivery Order'  :
+    topOrderMode === 'takeaway' ? '🥡 Takeout Order'  :
+                                  '🍽️ Dine-in Order';
 
   const handleCheckout = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isDelivery && !deliveryAddress.trim()) return;
     const defaultName =
-      orderType === 'takeaway' ? `Takeout (${currentTable || 'Walk-in'})` :
-      orderType === 'both'     ? `Dine-in + Takeout – ${currentTable || 'Table'}` :
-                                 `Diner at ${currentTable || 'Table 1'}`;
+      isDelivery              ? `Delivery — ${deliveryAddress}` :
+      isTakeout               ? `Takeout (${currentTable || 'Walk-in'})` :
+                                `Diner at ${currentTable || 'Table 1'}`;
 
     const newOrder = placeOrder(
       customerName || defaultName,
@@ -72,8 +80,9 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
         subtotal,
         vat,
         orderType,
+        deliveryAddress: isDelivery ? deliveryAddress : undefined,
         packagingFee: packagingFee > 0 ? packagingFee : undefined,
-        packCount: hasTakeout ? effectivePacks : undefined,
+        packCount: isTakeout ? effectivePacks : undefined,
       }
     );
     if (newOrder) setOrderPlacedSuccess(newOrder.id);
@@ -110,13 +119,14 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-neutral-900">Order Placed!</h3>
+            <h3 className="text-lg font-bold text-neutral-900">Order Placed! 🎉</h3>
             <p className="text-xs text-neutral-500 mt-1 mb-4">
-              Ticket <span className="font-mono font-bold text-neutral-800">#{orderPlacedSuccess}</span> sent to {activeRestaurant?.name || 'the'}'s kitchen.
+              Ticket <span className="font-mono font-bold text-neutral-800">#{orderPlacedSuccess}</span> sent to {activeRestaurant?.name || 'the'}'s kitchen instantly.
             </p>
             <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 w-full text-xs text-neutral-600 mb-6 font-mono space-y-1 text-left">
-              <div>Table: {currentTable || 'Table 01'}</div>
+              {currentTable && <div>Table: {currentTable}</div>}
               <div>Type: {headerLabel}</div>
+              {isDelivery && deliveryAddress && <div>To: {deliveryAddress}</div>}
               <div>Source: {isNfcSource ? 'NFC Card Tap' : 'QR Scan'}</div>
               <div>
                 Payment:{' '}
@@ -134,87 +144,110 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
           </div>
         ) : (
           <>
+            {/* ── BIG ORDER TYPE BANNER (the most obvious choice) ── */}
+            {!isCounterMode && (
+              <div className="px-4 pt-3 pb-2 border-b border-neutral-100 shrink-0">
+                <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">How would you like your order?</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {/* Dine-in */}
+                  <button
+                    type="button"
+                    onClick={() => setTopOrderMode('dine_in')}
+                    className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl border-2 font-bold text-xs transition-all ${
+                      topOrderMode === 'dine_in'
+                        ? 'border-neutral-900 bg-neutral-900 text-white shadow-md scale-[1.03]'
+                        : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-400'
+                    }`}
+                  >
+                    <UtensilsCrossed className="w-5 h-5" />
+                    <span>Eat Here</span>
+                    {currentTable && (
+                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${topOrderMode === 'dine_in' ? 'bg-white/20' : 'bg-neutral-200'}`}>
+                        {currentTable}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Takeout */}
+                  <button
+                    type="button"
+                    onClick={() => setTopOrderMode('takeaway')}
+                    className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl border-2 font-bold text-xs transition-all ${
+                      topOrderMode === 'takeaway'
+                        ? 'border-amber-500 bg-amber-500 text-white shadow-md scale-[1.03]'
+                        : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-amber-300'
+                    }`}
+                  >
+                    <Package className="w-5 h-5" />
+                    <span>Pack to Go</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded ${topOrderMode === 'takeaway' ? 'bg-white/20' : 'bg-neutral-200'}`}>Takeout</span>
+                  </button>
+
+                  {/* Delivery */}
+                  <button
+                    type="button"
+                    onClick={() => setTopOrderMode('delivery')}
+                    className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl border-2 font-bold text-xs transition-all ${
+                      topOrderMode === 'delivery'
+                        ? 'border-blue-500 bg-blue-500 text-white shadow-md scale-[1.03]'
+                        : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-blue-300'
+                    }`}
+                  >
+                    <Bike className="w-5 h-5" />
+                    <span>Delivery</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded ${topOrderMode === 'delivery' ? 'bg-white/20' : 'bg-neutral-200'}`}>To you</span>
+                  </button>
+                </div>
+
+                {/* Counter mode — single fast label */}
+              </div>
+            )}
+
+            {isCounterMode && (
+              <div className="mx-4 mt-3 mb-2 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl shrink-0">
+                <Zap className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="text-xs font-bold text-amber-900">Counter Takeaway — your order will be ready at the counter</span>
+              </div>
+            )}
+
             {/* ── Cart Items ── */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-
-              {/* Legend */}
-              {cart.length > 0 && (
-                <div className="flex items-center gap-3 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-[11px] text-neutral-500">
-                  <span className="font-semibold text-neutral-700">Tap to choose per item:</span>
-                  <span className="flex items-center gap-1"><UtensilsCrossed className="w-3 h-3 text-neutral-600" /> Eat here</span>
-                  <span className="flex items-center gap-1"><Package className="w-3 h-3 text-amber-600" /> Pack to go</span>
-                </div>
-              )}
 
               {cart.length === 0 ? (
                 <div className="text-center py-16 text-neutral-400">
                   <ShoppingBag className="w-10 h-10 mx-auto mb-2 text-neutral-300" />
                   <p className="text-sm font-semibold text-neutral-600">Your cart is empty</p>
-                  <p className="text-xs text-neutral-400 mt-1">Flip through the menu and add dishes you'd like to order.</p>
+                  <p className="text-xs text-neutral-400 mt-1">Go back to the menu and tap <strong>+</strong> on any dish.</p>
                 </div>
               ) : (
                 cart.map((ci, index) => {
-                  const isItemTakeout = ci.itemType === 'takeaway';
+                  const itemPrice = (ci.foodItem?.price ?? (ci as any).price ?? 0);
                   return (
                     <div
                       key={index}
-                      className={`p-3 rounded-xl border text-xs transition-all ${
-                        isItemTakeout
-                          ? 'bg-amber-50 border-amber-200'
-                          : 'bg-neutral-50 border-neutral-200'
-                      }`}
+                      className="p-3 rounded-xl border border-neutral-200 bg-neutral-50 text-xs space-y-2"
                     >
                       {/* Item name + remove */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <span className="font-bold text-neutral-900 block truncate">{ci.foodItem?.name || (ci as any).name || (ci as any).title || 'Item'}</span>
+                          <span className="font-bold text-neutral-900 block leading-tight">
+                            {ci.foodItem?.name || (ci as any).name || (ci as any).title || 'Item'}
+                          </span>
                           {ci.notes && (
                             <div className="text-[11px] text-neutral-500 mt-0.5 italic">Note: {ci.notes}</div>
                           )}
                         </div>
                         <button
                           onClick={() => removeFromCart(index)}
-                          className="text-neutral-400 hover:text-red-600 transition-colors p-1 shrink-0"
+                          className="text-neutral-300 hover:text-red-500 transition-colors p-1 shrink-0"
                           title="Remove"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
-                      {/* Dine-in / Takeout toggle + qty + price */}
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-neutral-200/60 gap-2">
-
-                        {/* Per-item type toggle */}
-                        <div className="flex items-center bg-white border border-neutral-200 rounded-lg overflow-hidden shadow-xs shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => updateCartItemType(index, 'dine_in')}
-                            title="Eat here"
-                            className={`flex items-center gap-1 px-2 py-1.5 text-[11px] font-bold transition-all ${
-                              !isItemTakeout
-                                ? 'bg-neutral-900 text-white'
-                                : 'text-neutral-500 hover:bg-neutral-100'
-                            }`}
-                          >
-                            <UtensilsCrossed className="w-3 h-3" />
-                            <span className="hidden sm:inline">Here</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateCartItemType(index, 'takeaway')}
-                            title="Pack to go"
-                            className={`flex items-center gap-1 px-2 py-1.5 text-[11px] font-bold transition-all ${
-                              isItemTakeout
-                                ? 'bg-amber-500 text-neutral-950'
-                                : 'text-neutral-500 hover:bg-neutral-100'
-                            }`}
-                          >
-                            <Package className="w-3 h-3" />
-                            <span className="hidden sm:inline">Pack</span>
-                          </button>
-                        </div>
-
-                        {/* Qty stepper */}
+                      {/* Qty + price row */}
+                      <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 bg-white border border-neutral-200 rounded-lg px-2 py-0.5 shadow-xs">
                           <button
                             onClick={() => updateCartItemQuantity(index, ci.quantity - 1)}
@@ -230,19 +263,10 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
-
-                        {/* Line price */}
-                        <span className="font-mono font-bold text-neutral-800 text-xs">
-                          {design.currencySymbol}{((ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1)).toLocaleString()}
+                        <span className="font-mono font-bold text-neutral-800 text-xs ml-auto">
+                          {design.currencySymbol}{(itemPrice * (ci.quantity || 1)).toLocaleString()}
                         </span>
                       </div>
-
-                      {/* Takeout label under item */}
-                      {isItemTakeout && (
-                        <div className="mt-1.5 text-[10px] text-amber-700 font-semibold flex items-center gap-1">
-                          <Package className="w-3 h-3" /> Packing to go
-                        </div>
-                      )}
                     </div>
                   );
                 })
@@ -251,15 +275,32 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
 
             {/* ── Checkout Form ── */}
             {cart.length > 0 && (
-              <form onSubmit={handleCheckout} className="p-4 border-t border-neutral-200 bg-neutral-50/50 space-y-3 text-xs shrink-0">
+              <form onSubmit={handleCheckout} className="p-4 border-t border-neutral-200 bg-neutral-50/50 space-y-3 text-xs shrink-0 max-h-[55vh] overflow-y-auto">
 
-                {/* Takeaway packs control — only shown when something is takeout */}
-                {hasTakeout && (
+                {/* Delivery address field */}
+                {isDelivery && (
+                  <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl space-y-1.5 animate-in fade-in">
+                    <label className="font-bold text-blue-900 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" /> Delivery Address *
+                    </label>
+                    <textarea
+                      required
+                      value={deliveryAddress}
+                      onChange={e => setDeliveryAddress(e.target.value)}
+                      rows={2}
+                      placeholder="Enter full delivery address..."
+                      className="w-full px-2 py-1.5 bg-white border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-neutral-900 resize-none"
+                    />
+                  </div>
+                )}
+
+                {/* Takeaway packs control */}
+                {isTakeout && (
                   <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2 animate-in fade-in">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="font-bold text-amber-950 block">Takeout Foil Packaging</span>
-                        <span className="text-[10px] text-amber-700">Sealed pack + cutlery + carrier bag</span>
+                        <span className="font-bold text-amber-950 block">Foil Pack + Cutlery</span>
+                        <span className="text-[10px] text-amber-700">Sealed pack + carrier bag per unit</span>
                       </div>
                       <span className="font-mono font-bold text-amber-900">
                         {design.currencySymbol}{packUnitPrice.toLocaleString()} / pack
@@ -267,7 +308,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                     </div>
                     <div className="flex items-center justify-between pt-1 border-t border-amber-200/60">
                       <span className="text-[11px] text-amber-900 font-medium">
-                        Packs needed <span className="opacity-60">({takeoutCount} takeout items)</span>:
+                        Packs needed ({cart.reduce((s,ci)=>s+ci.quantity,0)} items):
                       </span>
                       <div className="flex items-center gap-2 bg-white border border-amber-300 rounded-lg px-2 py-0.5">
                         <button type="button" onClick={() => setPackCount(c => Math.max(1, c - 1))} className="text-amber-800 hover:text-amber-950 font-bold px-1">-</button>
@@ -278,25 +319,13 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                   </div>
                 )}
 
-                {/* Summary of what's where */}
-                {orderType === 'both' && (
-                  <div className="flex gap-2 text-[11px] font-semibold">
-                    <span className="flex-1 text-center py-1.5 bg-neutral-100 rounded-lg text-neutral-700">
-                      🍽️ {cart.filter(ci => !ci.itemType || ci.itemType === 'dine_in').reduce((s,ci)=>s+ci.quantity,0)} items — Eat here
-                    </span>
-                    <span className="flex-1 text-center py-1.5 bg-amber-100 rounded-lg text-amber-800">
-                      🥡 {takeoutCount} items — Takeout
-                    </span>
-                  </div>
-                )}
-
                 {/* Cost Breakdown */}
                 <div className="space-y-1 border-b border-neutral-200 pb-3">
                   <div className="flex justify-between text-neutral-600">
                     <span>Subtotal</span>
                     <span className="font-mono">{design.currencySymbol}{subtotal.toLocaleString()}</span>
                   </div>
-                  {hasTakeout && packagingFee > 0 && (
+                  {isTakeout && packagingFee > 0 && (
                     <div className="flex justify-between text-amber-800 font-medium">
                       <span>Packaging ({effectivePacks}× {design.currencySymbol}{packUnitPrice.toLocaleString()})</span>
                       <span className="font-mono">+{design.currencySymbol}{packagingFee.toLocaleString()}</span>
@@ -320,21 +349,21 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                     value={customerName}
                     onChange={e => setCustomerName(e.target.value)}
                     placeholder="Your Name (e.g. David Adebayo)"
-                    className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-900"
+                    className="w-full px-3 py-2.5 bg-white border border-neutral-200 rounded-xl focus:outline-none focus:border-neutral-900"
                   />
                   <input
                     type="tel"
                     value={customerPhone}
                     onChange={e => setCustomerPhone(e.target.value)}
                     placeholder="Phone number (optional)"
-                    className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-neutral-900"
+                    className="w-full px-3 py-2.5 bg-white border border-neutral-200 rounded-xl focus:outline-none focus:border-neutral-900"
                   />
                 </div>
 
                 {/* Payment Method */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider">Payment</label>
+                    <label className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider">Payment Method</label>
                     <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-semibold">100% Direct to Restaurant</span>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5">
@@ -343,28 +372,28 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                         key={method}
                         type="button"
                         onClick={() => setPaymentChoice(method)}
-                        className={`p-2 rounded-xl border text-center transition-all ${
+                        className={`p-2.5 rounded-xl border text-center transition-all ${
                           paymentChoice === method
                             ? 'border-neutral-900 bg-neutral-900 text-white font-bold shadow-xs'
                             : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
                         }`}
                       >
-                        {method === 'pos'      && <><CreditCard className="w-4 h-4 mx-auto mb-1 text-amber-400" /><div className="text-[11px]">Card / POS</div><div className="text-[9px] opacity-70">At Table</div></>}
+                        {method === 'pos'      && <><CreditCard className="w-4 h-4 mx-auto mb-1 text-amber-400" /><div className="text-[11px]">Card / POS</div><div className="text-[9px] opacity-70">At Counter</div></>}
                         {method === 'cash'     && <><Coins      className="w-4 h-4 mx-auto mb-1 text-amber-400" /><div className="text-[11px]">Cash</div><div className="text-[9px] opacity-70">To Waiter</div></>}
-                        {method === 'transfer' && <><Building2  className="w-4 h-4 mx-auto mb-1 text-amber-400" /><div className="text-[11px]">Transfer</div><div className="text-[9px] opacity-70">Direct Bank</div></>}
+                        {method === 'transfer' && <><Building2  className="w-4 h-4 mx-auto mb-1 text-amber-400" /><div className="text-[11px]">Transfer</div><div className="text-[9px] opacity-70">Bank</div></>}
                       </button>
                     ))}
                   </div>
                   <p className="text-[10px] text-neutral-400 text-center">
-                    🔒 TapMenu never holds your money. Payments go directly to {activeRestaurant?.name || 'the restaurant'}.
+                    💚 TapMenu never holds your money. Payments go directly to {activeRestaurant?.name || 'the restaurant'}.
                   </p>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm transition-colors shadow-md flex items-center justify-center gap-2"
+                  className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold rounded-xl text-sm transition-colors shadow-md flex items-center justify-center gap-2 active:scale-[0.98]"
                 >
-                  <span>Confirm Order · {design.currencySymbol}{total.toLocaleString()}</span>
+                  <span>Send Order · {design.currencySymbol}{total.toLocaleString()}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
