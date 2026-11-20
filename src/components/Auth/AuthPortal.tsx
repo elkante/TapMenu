@@ -12,14 +12,21 @@ import {
   Coins, 
   CheckCircle2, 
   QrCode,
-  ShieldCheck
+  ShieldCheck,
+  Zap,
+  ChevronLeft
 } from 'lucide-react';
+
+type BusinessType = 'restaurant' | 'vendor';
 
 export const AuthPortal: React.FC = () => {
   const { switchRestaurant, showNotification } = useApp();
   const [tab, setTab] = useState<'signup' | 'login'>('signup');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Step 1: Choose business type (only for signup)
+  const [businessType, setBusinessType] = useState<BusinessType | null>(null);
 
   // Signup fields
   const [name, setName] = useState('');
@@ -32,7 +39,7 @@ export const AuthPortal: React.FC = () => {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Auto-slugify restaurant name
+  // Auto-slugify name
   const handleNameChange = (val: string) => {
     setName(val);
     if (!slug || slug === name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) {
@@ -47,22 +54,24 @@ export const AuthPortal: React.FC = () => {
     setLoading(true);
 
     try {
+      const isVendor = businessType === 'vendor';
       const res = await registerRestaurant({
         name,
         slug,
         email,
         password,
         currency,
+        plan: isVendor ? 'vendor' : 'basic',
+        serviceMode: isVendor ? 'counter_only' : 'table_service',
       });
 
       if (!res.success || !res.restaurant) {
-        setErrorMsg(res.error || 'Failed to create restaurant. Please try another slug.');
+        setErrorMsg(res.error || 'Failed to create account. Please try another slug.');
         setLoading(false);
         return;
       }
 
-      showNotification(`🎉 Restaurant "${res.restaurant.name}" created!`);
-      // Reload or navigate to dashboard
+      showNotification(`🎉 ${isVendor ? 'Vendor' : 'Restaurant'} "${res.restaurant.name}" created!`);
       window.location.href = window.location.pathname;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Registration failed';
@@ -78,6 +87,7 @@ export const AuthPortal: React.FC = () => {
 
     try {
       const res = await loginRestaurantOwner(loginEmail, loginPassword);
+
       if (!res.success || !res.restaurant) {
         setErrorMsg(res.error || 'Login failed. Please check your credentials.');
         setLoading(false);
@@ -92,6 +102,8 @@ export const AuthPortal: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const isVendor = businessType === 'vendor';
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col justify-between p-4 sm:p-6 font-sans">
@@ -112,7 +124,7 @@ export const AuthPortal: React.FC = () => {
             href="/?r=demo&table=Table+5"
             className="text-xs font-semibold text-neutral-400 hover:text-white px-3 py-1.5 rounded-lg border border-neutral-800 hover:border-neutral-700 transition-colors"
           >
-            Live Demo Menu &rarr;
+            Live Demo &rarr;
           </a>
         </div>
       </header>
@@ -125,20 +137,20 @@ export const AuthPortal: React.FC = () => {
           </h1>
           <p className="text-xs sm:text-sm text-neutral-400 mt-1.5 max-w-sm mx-auto">
             {tab === 'signup'
-              ? 'Get a dedicated URL slug, unique table QR codes, and a live kitchen display in seconds.'
-              : 'Log in to manage your menu items, table QR codes, and live kitchen orders.'}
+              ? 'Get a dedicated URL, QR codes, and a live kitchen display in seconds.'
+              : 'Log in to manage your menu, orders, and kitchen display.'}
           </p>
         </div>
 
         {/* Tab Switcher */}
         <div className="grid grid-cols-2 p-1 bg-neutral-900 border border-neutral-800 rounded-2xl mb-6">
           <button
-            onClick={() => { setTab('signup'); setErrorMsg(null); }}
+            onClick={() => { setTab('signup'); setBusinessType(null); setErrorMsg(null); }}
             className={`py-2 rounded-xl text-xs font-bold transition-all ${
               tab === 'signup' ? 'bg-amber-500 text-neutral-950 shadow' : 'text-neutral-400 hover:text-white'
             }`}
           >
-            Create Restaurant
+            Create Account
           </button>
           <button
             onClick={() => { setTab('login'); setErrorMsg(null); }}
@@ -156,122 +168,217 @@ export const AuthPortal: React.FC = () => {
           </div>
         )}
 
-        {/* SIGN UP FORM */}
+        {/* SIGN UP FLOW */}
         {tab === 'signup' ? (
-          <form onSubmit={handleRegister} className="bg-neutral-900/80 border border-neutral-800 p-6 rounded-3xl space-y-4 shadow-xl">
-            <div>
-              <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <Store className="w-3.5 h-3.5 text-amber-400" />
-                <span>Restaurant Name *</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="e.g. Lagos Grill & Bistro"
-                className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500"
-              />
-            </div>
+          <>
+            {/* ── STEP 1: Business Type Selector ── */}
+            {businessType === null ? (
+              <div className="space-y-3">
+                <p className="text-center text-xs text-neutral-400 font-semibold uppercase tracking-wider mb-4">
+                  What kind of business are you?
+                </p>
 
-            <div>
-              <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-amber-400" />
-                <span>Menu URL Slug *</span>
-              </label>
-              <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-xl px-3 focus-within:border-amber-500">
-                <span className="text-[11px] text-neutral-500 font-mono">/?r=</span>
-                <input
-                  type="text"
-                  required
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ''))}
-                  placeholder="lagos-grill"
-                  className="w-full py-2.5 bg-transparent text-xs text-amber-400 font-mono font-bold focus:outline-none"
-                />
-              </div>
-              <p className="text-[10px] text-neutral-500 mt-1">
-                Your diners will access your menu via: <span className="font-mono text-neutral-400">/?r={slug || 'your-slug'}&table=1</span>
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Email *</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="owner@restaurant.com"
-                  className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <Coins className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Currency</span>
-                </label>
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+                {/* Restaurant card */}
+                <button
+                  type="button"
+                  onClick={() => setBusinessType('restaurant')}
+                  className="w-full p-5 bg-neutral-900 border-2 border-neutral-800 hover:border-amber-500 rounded-2xl text-left transition-all group"
                 >
-                  <option value="₦">₦ (Naira)</option>
-                  <option value="$">$ (USD)</option>
-                  <option value="£">£ (GBP)</option>
-                  <option value="€">€ (EUR)</option>
-                  <option value="KSh">KSh (KES)</option>
-                  <option value="GH₵">GH₵ (GHS)</option>
-                  <option value="R">R (ZAR)</option>
-                </select>
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:bg-amber-500/20 transition-colors">
+                      <UtensilsCrossed className="w-6 h-6 text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-extrabold text-sm text-white mb-1">Restaurant / Café / Bar</div>
+                      <div className="text-[11px] text-neutral-400 leading-relaxed">
+                        Full table system with QR codes per table, waiter calls, dine-in &amp; takeout orders, and a live kitchen display.
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-[11px]">
+                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded font-bold">From ₦8k/mo</span>
+                        <span className="text-neutral-500">· Multiple plan tiers</span>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-neutral-600 group-hover:text-amber-400 transition-colors shrink-0 mt-1" />
+                  </div>
+                </button>
+
+                {/* Street Vendor card */}
+                <button
+                  type="button"
+                  onClick={() => setBusinessType('vendor')}
+                  className="w-full p-5 bg-neutral-900 border-2 border-neutral-800 hover:border-amber-500 rounded-2xl text-left transition-all group"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:bg-amber-500/20 transition-colors">
+                      <Zap className="w-6 h-6 text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-extrabold text-sm text-white mb-1">Street Vendor / Food Stall</div>
+                      <div className="text-[11px] text-neutral-400 leading-relaxed">
+                        One QR code, one link. Customers scan, order, and you see it instantly on your phone or screen. No tables needed.
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-[11px]">
+                        <span className="px-2 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded font-bold">₦4,000/mo flat</span>
+                        <span className="text-neutral-500">· Simple &amp; affordable</span>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-neutral-600 group-hover:text-amber-400 transition-colors shrink-0 mt-1" />
+                  </div>
+                </button>
               </div>
-            </div>
+            ) : (
+              /* ── STEP 2: Registration Form ── */
+              <form onSubmit={handleRegister} className="bg-neutral-900/80 border border-neutral-800 p-6 rounded-3xl space-y-4 shadow-xl">
 
-            <div>
-              <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                <span>Password *</span>
-              </label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
-                className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500"
-              />
-            </div>
+                {/* Back + selected type badge */}
+                <div className="flex items-center justify-between mb-1">
+                  <button
+                    type="button"
+                    onClick={() => { setBusinessType(null); setErrorMsg(null); }}
+                    className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-white transition-colors"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" /> Change type
+                  </button>
+                  <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                    isVendor
+                      ? 'bg-green-500/15 text-green-400 border border-green-500/25'
+                      : 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
+                  }`}>
+                    {isVendor ? <><Zap className="w-3 h-3" /> Street Vendor — ₦4,000/mo</> : <><UtensilsCrossed className="w-3 h-3" /> Restaurant</>}
+                  </span>
+                </div>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50"
-              >
-                {loading ? 'Creating Your Menu...' : 'Create Restaurant & Open Dashboard'}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+                {/* Name */}
+                <div>
+                  <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Store className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{isVendor ? 'Stall / Brand Name *' : 'Restaurant Name *'}</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    placeholder={isVendor ? 'e.g. Mama Suya, Iya Basira Puff Puff' : 'e.g. Lagos Grill & Bistro'}
+                    className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
 
-            <div className="pt-2 border-t border-neutral-800 text-center">
-              <span className="text-[11px] text-neutral-500">
-                🔒 Direct payments only. Diners pay via Card/POS or Cash to your staff.
-              </span>
-            </div>
-          </form>
+                {/* Slug */}
+                <div>
+                  <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Menu URL *</span>
+                  </label>
+                  <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-xl px-3 focus-within:border-amber-500">
+                    <span className="text-[11px] text-neutral-500 font-mono shrink-0">tapmenu.app/?r=</span>
+                    <input
+                      type="text"
+                      required
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ''))}
+                      placeholder="your-brand"
+                      className="flex-1 px-2 py-2.5 bg-transparent text-xs text-amber-400 font-mono placeholder-neutral-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Email Address *</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="owner@example.com"
+                    className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Currency */}
+                <div>
+                  <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Coins className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Currency</span>
+                  </label>
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="₦">₦ (Naira)</option>
+                    <option value="$">$ (USD)</option>
+                    <option value="£">£ (GBP)</option>
+                    <option value="€">€ (EUR)</option>
+                    <option value="KSh">KSh (KES)</option>
+                    <option value="GH₵">GH₵ (GHS)</option>
+                    <option value="R">R (ZAR)</option>
+                  </select>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Password *</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Minimum 6 characters"
+                    className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Vendor info box */}
+                {isVendor && (
+                  <div className="p-3 bg-green-500/8 border border-green-500/20 rounded-xl text-[11px] text-green-300 space-y-1">
+                    <div className="font-bold text-green-400 flex items-center gap-1.5"><Zap className="w-3 h-3" /> What you get with Vendor plan:</div>
+                    <div>⚡ Single QR code / link — share anywhere</div>
+                    <div>📱 Instant orders to your phone or screen</div>
+                    <div>🍽️ Full digital menu with photos</div>
+                    <div>📊 Order history &amp; daily summary</div>
+                    <div className="text-green-500 font-bold pt-0.5">₦4,000/month — no hidden fees</div>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                  >
+                    {loading
+                      ? 'Setting up your account...'
+                      : isVendor
+                        ? 'Create Vendor Account & Open Dashboard'
+                        : 'Create Restaurant & Open Dashboard'}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="pt-2 border-t border-neutral-800 text-center">
+                  <span className="text-[11px] text-neutral-500">
+                    💚 Payments go directly to you — TapMenu never touches your money.
+                  </span>
+                </div>
+              </form>
+            )}
+          </>
         ) : (
           /* SIGN IN FORM */
           <form onSubmit={handleLogin} className="bg-neutral-900/80 border border-neutral-800 p-6 rounded-3xl space-y-4 shadow-xl">
             <div>
               <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-amber-400" />
-                <span>Restaurant Email or Slug *</span>
+                <span>Email or Slug *</span>
               </label>
               <input
                 type="text"
@@ -303,7 +410,7 @@ export const AuthPortal: React.FC = () => {
                 disabled={loading}
                 className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50"
               >
-                {loading ? 'Logging In...' : 'Sign In to Restaurant Portal'}
+                {loading ? 'Logging In...' : 'Sign In to Dashboard'}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -313,7 +420,7 @@ export const AuthPortal: React.FC = () => {
 
       {/* Footer */}
       <footer className="max-w-5xl mx-auto w-full text-center py-4 text-[11px] text-neutral-600 border-t border-neutral-900">
-        TapMenu &copy; {new Date().getFullYear()} &middot; Digital Menus, Table QR Codes & Kitchen Display System
+        TapMenu &copy; {new Date().getFullYear()} &middot; Digital Menus, Table QR Codes &amp; Kitchen Display System
       </footer>
     </div>
   );

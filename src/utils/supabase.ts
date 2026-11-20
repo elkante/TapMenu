@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+﻿import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { RestaurantTenant, FoodItem, Order, WaiterCall, MenuBookPage } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kxszokrflzknhtsicbzm.supabase.co';
@@ -128,7 +128,7 @@ export function setActiveSession(session: OwnerSession | null) {
  */
 function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const currency = rRow.currency || '₦';
+  const currency = rRow.currency || 'â‚¦';
 
   // Check local cache for existing restaurant structure
   const stored = getStoredRestaurants();
@@ -283,7 +283,7 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
     slug: rRow.slug,
     name: rRow.name,
     tagline: rRow.tagline || 'Kitchen & Bar',
-    logo: rRow.logo || localMatch?.logo || '🛡️',
+    logo: rRow.logo || localMatch?.logo || 'ðŸ›¡ï¸',
     coverImage: rRow.cover_image || localMatch?.coverImage || '',
     address: rRow.address || localMatch?.address || '',
     phone: rRow.phone || localMatch?.phone || '',
@@ -370,6 +370,7 @@ export async function registerRestaurant(data: {
   coverColor?: string;
   plan?: string;
   tableLimit?: number | null;
+  serviceMode?: 'table_service' | 'counter_only';
 }): Promise<{ success: boolean; restaurant?: RestaurantTenant; error?: string }> {
   const cleanSlug = data.slug.toLowerCase().trim().replace(/[^a-z0-9-]+/g, '-').replace(/(^-|-$)/g, '');
   
@@ -382,6 +383,7 @@ export async function registerRestaurant(data: {
   const coverColor = data.coverColor || '#0c2e22';
   const initialPlan = (data.plan || 'basic').toLowerCase();
   const initialTableLimit = data.tableLimit ?? null;
+  const initialServiceMode = data.serviceMode || 'table_service';
 
   // 1. Try Supabase Auth
   if (supabase && data.password && data.email) {
@@ -420,10 +422,11 @@ export async function registerRestaurant(data: {
           name: data.name.trim(),
           slug: cleanSlug,
           tagline: data.tagline?.trim() || 'Kitchen & Bar',
-          logo: data.logo || '🛡️',
-          currency: data.currency || '₦',
+          logo: data.logo || 'ðŸ›¡ï¸',
+          currency: data.currency || 'â‚¦',
           plan: initialPlan,
           table_limit: initialTableLimit,
+          service_mode: initialServiceMode,
         }
       ]);
 
@@ -438,8 +441,8 @@ export async function registerRestaurant(data: {
             name: data.name.trim(),
             slug: cleanSlug,
             tagline: data.tagline?.trim() || 'Kitchen & Bar',
-            logo: data.logo || '🛡️',
-            currency: data.currency || '₦',
+            logo: data.logo || 'ðŸ›¡ï¸',
+            currency: data.currency || 'â‚¦',
           }
         ]);
         insErr = retry.error;
@@ -463,11 +466,12 @@ export async function registerRestaurant(data: {
     name: data.name.trim(),
     slug: cleanSlug,
     tagline: data.tagline?.trim() || 'Kitchen & Bar',
-    logo: data.logo || '🛡️',
-    currency: data.currency || '₦',
+    logo: data.logo || 'ðŸ›¡ï¸',
+    currency: data.currency || 'â‚¦',
     cover_color: coverColor,
     plan: initialPlan,
     table_limit: initialTableLimit,
+    service_mode: initialServiceMode,
   }, []);
 
   // Save to local cache (new restaurant first)
@@ -690,7 +694,7 @@ export async function syncOrderToSupabase(order: Order): Promise<boolean> {
     }
 
     // Clean payload matching exact Supabase orders table schema
-    // Always include payment_method in base payload — this is a core field
+    // Always include payment_method in base payload â€” this is a core field
     const basePayload: Record<string, any> = {
       id: order.id,
       restaurant_id: order.restaurantId,
@@ -700,7 +704,7 @@ export async function syncOrderToSupabase(order: Order): Promise<boolean> {
       total: Number(order.total) || 0,
       status: order.status || 'pending',
       source: order.source || 'qr',
-      payment_method: order.paymentMethod || 'pos', // Always persist — prevents cash showing as POS
+      payment_method: order.paymentMethod || 'pos', // Always persist â€” prevents cash showing as POS
     };
 
     const fullPayload: Record<string, any> = {
@@ -770,7 +774,7 @@ export async function syncWaiterCallToSupabase(call: WaiterCall): Promise<boolea
 export async function fetchOrdersFromSupabase(restaurantId: string, slug?: string): Promise<Order[]> {
   if (!supabase || !restaurantId) return [];
   try {
-    // Only fetch today's orders — drastically cuts egress vs fetching all-time history
+    // Only fetch today's orders â€” drastically cuts egress vs fetching all-time history
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayISO = todayStart.toISOString();
