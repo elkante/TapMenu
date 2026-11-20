@@ -1596,3 +1596,4 @@ export async function syncAllDishesToSupabase(
   }
 }
 
+

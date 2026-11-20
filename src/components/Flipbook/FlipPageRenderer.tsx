@@ -378,14 +378,17 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
                       onSelectItem?.(item);
                     }
                   }}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                  }}
                   onTouchEnd={(e) => {
                     e.stopPropagation();
                   }}
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-90 text-neutral-950 font-black shadow-xs transition-all shrink-0 cursor-pointer flex items-center justify-center border border-amber-600/30 z-10"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-90 text-neutral-950 font-black shadow-xs transition-all shrink-0 cursor-pointer flex items-center justify-center border border-amber-600/30 z-20 pointer-events-auto"
                   title="Add directly to cart"
                   aria-label={`Add ${item.name} to cart`}
                 >
-                  <Plus className="w-4 h-4 text-neutral-950 stroke-[3]" />
+                  <Plus className="w-4 h-4 text-neutral-950 stroke-[3] pointer-events-none" />
                 </button>
               )}
             </div>

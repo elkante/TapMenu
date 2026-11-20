@@ -22,6 +22,7 @@ export const FlipbookViewer: React.FC = () => {
     activeRestaurant, 
     setCurrentView, 
     addToCart, 
+    showNotification
   } = useApp();
 
   const pages = activeRestaurant.pages || [];
@@ -44,6 +45,12 @@ export const FlipbookViewer: React.FC = () => {
   const touchStartY = useRef<number | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    // If user touched an interactive button, input or link, do NOT start a swipe gesture
+    if ((e.target as HTMLElement).closest('button, input, select, textarea, a, [role="button"]')) {
+      touchStartX.current = null;
+      touchStartY.current = null;
+      return;
+    }
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
   };
@@ -259,7 +266,10 @@ export const FlipbookViewer: React.FC = () => {
                       if (!it.isSoldOut) setSelectedItem(it);
                     }}
                     onAddToCart={(it) => {
-                      if (!it.isSoldOut) addToCart(it);
+                      if (!it.isSoldOut) {
+                        addToCart(it);
+                        showNotification(`🛒 Added ${it.name} to cart!`);
+                      }
                     }}
                     pageNumberDisplay={currentPageIndex + 1}
                   />
