@@ -772,30 +772,34 @@ export const RestaurantDashboard: React.FC = () => {
   const renderEndDayModal = () => {
     if (!isEndDayModalOpen) return null;
     return (
-      <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-4">
         <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-neutral-200 text-xs animate-in zoom-in-95 duration-200">
           {/* Modal Header */}
           <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-amber-500 text-neutral-950 flex items-center justify-center font-bold">
-                <Receipt className="w-4 h-4" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-amber-500/20 text-amber-600 flex items-center justify-center font-bold border border-amber-300">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <h3 className="text-sm sm:text-base font-extrabold text-neutral-900">End Day Shift · Z-Report</h3>
-                <p className="text-[11px] text-neutral-500">{activeRestaurant.name} · Cumulative Reconciliation</p>
+                <h3 className="text-sm sm:text-base font-extrabold text-neutral-900">
+                  Are you sure you want to end today's shift?
+                </h3>
+                <p className="text-[11px] text-neutral-500">{activeRestaurant.name} · Cumulative Day Closeout & Z-Report</p>
               </div>
             </div>
             <button 
+              type="button"
               onClick={() => setIsEndDayModalOpen(false)}
-              className="text-neutral-400 hover:text-neutral-800 p-1 rounded-lg"
+              className="text-neutral-400 hover:text-neutral-800 p-1.5 rounded-xl hover:bg-neutral-100 transition-colors"
+              title="Close modal"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Shift Summary Cards */}
           <div className="my-4 space-y-3">
-            <div className="p-3 bg-neutral-900 text-white rounded-2xl flex items-center justify-between">
+            <div className="p-3.5 bg-neutral-900 text-white rounded-2xl flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Total Accumulated Sales Today</span>
                 <span className="font-mono text-2xl font-black text-amber-400">{design.currencySymbol}{totalDayRevenue.toLocaleString()}</span>
@@ -841,25 +845,45 @@ export const RestaurantDashboard: React.FC = () => {
           </div>
 
           {/* Shift confirmation notice */}
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2 mb-3">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold block">End Today's Kitchen Shift</span>
-              <span>Are you sure you want to end today's shift? This compiles all sales and expenses into today's permanent Z-Report archive.</span>
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-xs flex items-start gap-2.5 mb-4">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="leading-relaxed">
+              <span className="font-bold block text-rose-950">Confirming will close today's shift register</span>
+              <span>All active orders, totals, and operational vouchers will be archived permanently to today's cloud Z-Report. This cannot be undone mid-shift.</span>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-3 border-t border-neutral-100">
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t border-neutral-100">
             <button
               type="button"
-              onClick={handleConfirmEndDay}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-md bg-rose-600 hover:bg-rose-500 text-white cursor-pointer active:scale-95"
-              title="Close Day & Save Archive"
+              onClick={() => setIsEndDayModalOpen(false)}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
             >
-              <Check className="w-3.5 h-3.5 text-white" />
-              <span>Yes, Close Day & Save Archive</span>
+              Cancel / Keep Shift Open
             </button>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handlePrintZReport}
+                className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl text-xs font-bold bg-neutral-800 hover:bg-neutral-700 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                title="Print thermal Z-Report slip"
+              >
+                <Printer className="w-3.5 h-3.5 text-amber-400" />
+                <span>Print Z-Slip</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmEndDay}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md bg-rose-600 hover:bg-rose-500 text-white cursor-pointer active:scale-95"
+                title="Close Day & Save Archive"
+              >
+                <Check className="w-3.5 h-3.5 text-white" />
+                <span>Yes, End Shift Now</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
