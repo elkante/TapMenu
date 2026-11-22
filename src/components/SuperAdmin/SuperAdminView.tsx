@@ -354,7 +354,8 @@ export const SuperAdminView: React.FC = () => {
       ...item, 
       plan: planId, 
       serviceMode: newServiceMode,
-      tableLimit: newTableLimit
+      tableLimit: newTableLimit,
+      design: { ...(item.design || {}), serviceMode: newServiceMode, plan: planId }
     } : item));
     showNotification(`Updated plan to ${planId.toUpperCase()} (${isVendor ? '⚡ Street Vendor' : '🍽️ Restaurant'}) for ${t.name}`);
   };
@@ -431,15 +432,19 @@ export const SuperAdminView: React.FC = () => {
   };
 
   const isVendorTenant = (t: RestaurantTenant) => {
-    const pl = (t.plan || '').toLowerCase();
-    // If it has any dine-in plan, it is ALWAYS a dine-in restaurant, NEVER a street vendor
-    if (pl.includes('basic') || pl.includes('standard') || pl.includes('premium') || pl.includes('enterprise')) {
+    // If explicitly marked as table_service, it is ALWAYS a dine-in restaurant
+    if (t.serviceMode === 'table_service') {
       return false;
     }
-    return pl === 'vendor' || 
-      pl === 'vendor-monthly' || 
-      pl === 'vendor-pro' || 
-      t.serviceMode === 'counter_only' ||
+    const pl = (t.plan || (t.design as any)?.plan || '').toLowerCase();
+    // If it has any dine-in plan, it is ALWAYS a dine-in restaurant, NEVER a street vendor
+    if (pl.includes('basic') || pl.includes('standard') || pl.includes('premium') || pl.includes('enterprise') || pl.includes('growth')) {
+      return false;
+    }
+    if (pl.includes('vendor')) {
+      return true;
+    }
+    return t.serviceMode === 'counter_only' ||
       (t.design as any)?.serviceMode === 'counter_only' ||
       (t.design as any)?.plan === 'vendor';
   };
@@ -2231,9 +2236,28 @@ export const SuperAdminView: React.FC = () => {
               {/* RESTAURANT: per-table QR grid */}
               {!isVendorModal && (
                 <div className="space-y-3">
-                  <label className="font-bold text-neutral-400 uppercase tracking-wider text-[10px]">
-                    {tables.length > 0 ? `Per-Table QR Codes (${tables.length} tables)` : 'Table QR Codes'}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-neutral-400 uppercase tracking-wider text-[10px]">
+                      {tables.length > 0 ? `Per-Table QR Codes (${tables.length} tables)` : 'Table QR Codes'}
+                    </label>
+                    {tables.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          showNotification(`Starting download for all ${tables.length} tables...`);
+                          for (const tbl of tables) {
+                            const tableUrl = `${origin}/?r=${qrModalTenant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
+                            await downloadTableQr(tableUrl, tbl.tableNumber);
+                            await new Promise(r => setTimeout(r, 400));
+                          }
+                        }}
+                        className="text-amber-400 hover:text-amber-300 font-bold text-[10px] flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Download All ({tables.length})</span>
+                      </button>
+                    )}
+                  </div>
 
                   {tables.length === 0 ? (
                     <div className="text-neutral-500 text-center py-6 bg-neutral-950 rounded-2xl border border-neutral-800">
@@ -2316,6 +2340,17 @@ export const SuperAdminView: React.FC = () => {
                                 <span className="font-mono font-bold text-white text-[11px]">{tbl.tableNumber}</span>
                                 <div className="flex items-center gap-2">
                                   <span className="font-mono text-neutral-500 text-[10px] truncate max-w-[140px]">{tableUrl}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      downloadTableQr(tableUrl, tbl.tableNumber);
+                                    }}
+                                    className="p-1 text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 rounded transition-colors"
+                                    title={`Download QR for ${tbl.tableNumber}`}
+                                  >
+                                    <Download className="w-3 h-3" />
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={(e) => {
