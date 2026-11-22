@@ -76,7 +76,7 @@ export const NotchedBottomBar: React.FC<NotchedBottomBarProps> = (props) => {
   };
 
   return (
-    <div className="fixed bottom-3 inset-x-3 sm:inset-x-6 z-50 md:hidden max-w-md mx-auto pointer-events-auto select-none">
+    <div className="fixed bottom-3 inset-x-3 sm:inset-x-6 z-50 md:hidden max-w-md mx-auto pointer-events-auto select-none no-print">
       <div className="relative h-16 w-full flex items-center justify-between">
         
         {/* Authentic SVG Concave Notched Backdrop with Luxury Amber Glow */}

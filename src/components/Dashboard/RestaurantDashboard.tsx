@@ -899,7 +899,7 @@ export const RestaurantDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-neutral-100 flex flex-col font-sans">
       {/* Top Staff Navigation */}
-      <header className="bg-neutral-900 text-white sticky top-0 z-40 border-b border-neutral-800">
+      <header className="bg-neutral-900 text-white sticky top-0 z-40 border-b border-neutral-800 no-print">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Mobile Hamburger Drawer Toggle (Matches PC Left Panel) */}
@@ -981,7 +981,7 @@ export const RestaurantDashboard: React.FC = () => {
       {/* Main Workspace: Desktop Left Sidebar + Central Panel Layout */}
       <div className="flex flex-1 min-h-0 w-full">
         {/* Desktop Left Side Panel Navigation */}
-        <aside className="hidden md:flex flex-col w-60 shrink-0 bg-neutral-900 border-r border-neutral-800 sticky top-16 h-[calc(100vh-64px)] overflow-y-auto z-30 select-none">
+        <aside className="hidden md:flex flex-col w-60 shrink-0 bg-neutral-900 border-r border-neutral-800 sticky top-16 h-[calc(100vh-64px)] overflow-y-auto z-30 select-none no-print">
           {/* Restaurant identity quick info */}
           <div className="p-4 border-b border-neutral-800/80">
             <div className="flex items-center justify-between text-xs">
