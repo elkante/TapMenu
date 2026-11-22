@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { sanitizeRestaurantLogo } from '../../utils/logoSanitizer';
-import { setActiveSession, saveStoredRestaurants, fileToDataUrl, saveDishToSupabase, deleteDishFromSupabase, saveShiftToSupabase, syncAllDishesToSupabase } from '../../utils/supabase';
+import { setActiveSession, saveStoredRestaurants, fileToDataUrl, saveDishToSupabase, deleteDishFromSupabase, saveShiftToSupabase, syncAllDishesToSupabase, updateRestaurantPlanInSupabase, syncRestaurantMetaToSupabase } from '../../utils/supabase';
 import { generateQrDataUrl } from '../../utils/nfc';
-import { getStoredPlans } from '../../utils/pricingConfig';
+import { getStoredPlans, getStoredVendorPlans, PlanTier } from '../../utils/pricingConfig';
 import { 
   ChefHat, 
   Utensils, 
@@ -53,7 +53,7 @@ import { KitchenDisplay } from './KitchenDisplay';
 import { OrderSmartCardsModal } from '../Hardware/OrderSmartCardsModal';
 import { MultiStoreManagerModal } from './MultiStoreManagerModal';
 import { getNetworkVerifiedDate, formatNetworkDate, formatNetworkTime } from '../../utils/networkTime';
-import { Package, DollarSign, Store, Lock, ShieldAlert } from 'lucide-react';
+import { Package, DollarSign, Store, Lock, ShieldAlert, Zap, ArrowRight } from 'lucide-react';
 
 export const RestaurantDashboard: React.FC = () => {
   const { 
@@ -84,7 +84,46 @@ export const RestaurantDashboard: React.FC = () => {
     (activeRestaurant?.design as any)?.serviceMode === 'counter_only'
   );
 
-  const [activeTab, setActiveTab] = useState<'kds' | 'menu' | 'inventory' | 'expenses' | 'archive' | 'tables' | 'settings'>('kds');
+  const [activeTab, setActiveTab] = useState<'kds' | 'menu' | 'inventory' | 'expenses' | 'archive' | 'tables' | 'settings' | 'plan'>('kds');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [planCategoryView, setPlanCategoryView] = useState<'restaurant' | 'vendor'>(isVendor ? 'vendor' : 'restaurant');
+  const [switchingPlan, setSwitchingPlan] = useState<string | null>(null);
+
+  const handleSwitchPlan = async (newPlanId: string) => {
+    if (!activeRestaurant.id) return;
+    setSwitchingPlan(newPlanId);
+    try {
+      const isTargetVendor = newPlanId === 'vendor' || newPlanId === 'vendor-monthly' || newPlanId === 'vendor-pro';
+      const targetServiceMode = isTargetVendor ? 'counter_only' : 'table_service';
+
+      let targetTableLimit: number | null = null;
+      if (!isTargetVendor) {
+        if (newPlanId === 'basic') targetTableLimit = 10;
+        else if (newPlanId === 'standard') targetTableLimit = 20;
+        else if (newPlanId === 'premium') targetTableLimit = 60;
+        else if (newPlanId === 'enterprise') targetTableLimit = null;
+      }
+
+      await updateRestaurantPlanInSupabase(activeRestaurant.id, newPlanId, targetTableLimit);
+      await syncRestaurantMetaToSupabase(activeRestaurant.id, {
+        plan: newPlanId,
+        serviceMode: targetServiceMode,
+        tableLimit: targetTableLimit ?? undefined
+      });
+
+      updateRestaurantMeta({
+        plan: newPlanId,
+        serviceMode: targetServiceMode,
+        tableLimit: targetTableLimit ?? undefined
+      });
+
+      showNotification(`🎉 Plan updated to ${newPlanId.toUpperCase()}!`);
+    } catch (err: any) {
+      showNotification('Failed to update plan. Please try again.');
+    } finally {
+      setSwitchingPlan(null);
+    }
+  };
   const [copiedSlug, setCopiedSlug] = useState(false);
   const [tableQrMap, setTableQrMap] = useState<Record<string, string>>({});
   const [vendorQrUrl, setVendorQrUrl] = useState<string>('');
@@ -1129,6 +1168,25 @@ export const RestaurantDashboard: React.FC = () => {
             >
               <Settings className="w-4 h-4 shrink-0" />
               <span>Settings</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('plan')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                activeTab === 'plan'
+                  ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <CreditCard className="w-4 h-4 shrink-0" />
+                <span>Plan & Add-ons</span>
+              </div>
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                activeTab === 'plan' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
+              }`}>
+                {(activeRestaurant.plan || (isVendor ? 'vendor' : 'basic')).toUpperCase()}
+              </span>
             </button>
           </nav>
 
@@ -2413,6 +2471,401 @@ export const RestaurantDashboard: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* ========================================================= */}
+        {/* TAB 8: SUBSCRIPTION PLAN & ADD-ON FEATURES */}
+        {/* ========================================================= */}
+        {activeTab === 'plan' && (() => {
+          const rawPlanId = (activeRestaurant.plan || (isVendor ? 'vendor' : 'basic')).toLowerCase();
+          const currentPlanTier = isVendor
+            ? (getStoredVendorPlans().find(p => p.id === rawPlanId) || getStoredVendorPlans()[0])
+            : (getStoredPlans().find(p => p.id === rawPlanId) || getStoredPlans()[0]);
+
+          const currentPlanName = currentPlanTier?.name || (isVendor ? 'Vendor' : 'Basic');
+          const currentPrice = currentPlanTier?.monthlyPrice || (isVendor ? 4000 : 8000);
+          const tableUsageCount = (activeRestaurant.tables || []).length;
+          const maxTablesAlloc = activeRestaurant.tableLimit ?? currentPlanTier?.maxTables ?? (isVendor ? null : 10);
+
+          const displayedPlans = planCategoryView === 'vendor'
+            ? getStoredVendorPlans()
+            : getStoredPlans();
+
+          return (
+            <div className="max-w-5xl mx-auto space-y-6 pb-12">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-200">
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-extrabold text-neutral-900 flex items-center gap-2">
+                    <CreditCard className="w-6 h-6 text-amber-500" />
+                    <span>Subscription Plan & Add-ons</span>
+                  </h1>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Manage your venue plan, active table capacity, and hardware add-ons.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="https://wa.me/2348000000000?text=Hello%20TapMenu%20Support!%20I%20have%20a%20question%20about%20my%20subscription%20plan."
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Billing Support</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Hero Status Card */}
+              <div className="bg-gradient-to-br from-neutral-900 via-neutral-950 to-neutral-900 text-white rounded-3xl p-5 sm:p-7 border border-neutral-800 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                
+                <div className="relative z-10 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Active Subscription
+                        </span>
+                        {isVendor ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <Zap className="w-2.5 h-2.5" /> Street Vendor
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-800 text-neutral-300 border border-neutral-700">
+                            🍽️ Dine-In Restaurant
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                        {currentPlanName} Plan
+                      </h2>
+                      <p className="text-xs text-neutral-400">
+                        {currentPlanTier?.tagline || 'Digital menu and instant mobile ordering system.'}
+                      </p>
+                    </div>
+
+                    <div className="text-left sm:text-right shrink-0">
+                      <div className="text-2xl sm:text-3xl font-black font-mono text-amber-400">
+                        ₦{currentPrice.toLocaleString()}
+                      </div>
+                      <div className="text-[11px] text-neutral-400">per month &middot; Renews automatically</div>
+                    </div>
+                  </div>
+
+                  {/* Resource Utilization Stats */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-neutral-800/80 text-xs">
+                    <div className="p-3 bg-neutral-950/70 rounded-2xl border border-neutral-850">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">Table Allocation</span>
+                      {isVendor ? (
+                        <div className="mt-1">
+                          <span className="font-bold text-amber-300 flex items-center gap-1 text-sm">
+                            <Zap className="w-3.5 h-3.5 text-amber-400" /> Walk-up Counter
+                          </span>
+                          <span className="text-[10px] text-neutral-500">No tables needed &middot; 1 QR code</span>
+                        </div>
+                      ) : (
+                        <div className="mt-1 space-y-1">
+                          <div className="flex items-center justify-between font-mono font-bold text-white text-sm">
+                            <span>{tableUsageCount} tables active</span>
+                            <span className="text-amber-400 text-xs">
+                              {maxTablesAlloc ? `${maxTablesAlloc} max` : 'Unlimited'}
+                            </span>
+                          </div>
+                          {maxTablesAlloc && (
+                            <div className="w-full bg-neutral-800 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className="bg-amber-500 h-full rounded-full transition-all"
+                                style={{ width: `${Math.min(100, Math.round((tableUsageCount / maxTablesAlloc) * 100))}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-neutral-950/70 rounded-2xl border border-neutral-850">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">Menu Content</span>
+                      <div className="mt-1 font-mono font-bold text-white text-sm">
+                        {allDishes.length} Dishes Published
+                      </div>
+                      <span className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
+                        <CheckCircle2 className="w-3 h-3" /> Live on flipbook menu
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-neutral-950/70 rounded-2xl border border-neutral-850">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">Service Mode</span>
+                      <div className="mt-1 font-bold text-white text-sm">
+                        {isVendor ? 'Counter & Takeaway' : 'Table Service & KDS'}
+                      </div>
+                      <span className="text-[10px] text-neutral-400 mt-0.5 block">
+                        {isVendor ? 'Single QR & customer link' : 'Per-table QR codes & staff call'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Plan Switcher & Category Filter */}
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-extrabold text-neutral-900 text-base">Select or Change Subscription Plan</h3>
+                    <p className="text-xs text-neutral-500">Switch tiers anytime. New table capacity activates immediately.</p>
+                  </div>
+
+                  {/* Monthly vs Annual Toggle */}
+                  <div className="inline-flex items-center p-1 bg-neutral-100 border border-neutral-200 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => setBillingCycle('monthly')}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${
+                        billingCycle === 'monthly'
+                          ? 'bg-neutral-900 text-white shadow-xs'
+                          : 'text-neutral-600 hover:text-neutral-900'
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBillingCycle('annual')}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 ${
+                        billingCycle === 'annual'
+                          ? 'bg-amber-500 text-neutral-950 shadow-xs'
+                          : 'text-neutral-600 hover:text-neutral-900'
+                      }`}
+                    >
+                      <span>Annual</span>
+                      <span className="px-1.5 py-0.2 rounded-full bg-neutral-950 text-amber-300 text-[9px] font-extrabold">2 Mos Free</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Plan Category Filter (Dine-in vs Street Vendor) */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPlanCategoryView('restaurant')}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+                      planCategoryView === 'restaurant'
+                        ? 'bg-neutral-900 text-white shadow-xs'
+                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                    }`}
+                  >
+                    <span>🍽️ Dine-In Restaurant Plans</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlanCategoryView('vendor')}
+                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+                      planCategoryView === 'vendor'
+                        ? 'bg-amber-500 text-neutral-950 shadow-xs'
+                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                    }`}
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Street Vendor Plans (Counter)</span>
+                  </button>
+                </div>
+
+                {/* Plan Cards Grid */}
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${planCategoryView === 'restaurant' ? 'lg:grid-cols-4' : 'lg:grid-cols-2 max-w-2xl'} gap-4`}>
+                  {displayedPlans.map((p) => {
+                    const isCurrent = rawPlanId === p.id || (p.id === 'basic' && rawPlanId === 'basic');
+                    const price = billingCycle === 'annual' ? p.annualPrice : p.monthlyPrice;
+                    const periodLabel = billingCycle === 'annual' ? '/ year' : '/ month';
+
+                    return (
+                      <div
+                        key={p.id}
+                        className={`rounded-3xl p-5 border flex flex-col justify-between transition-all ${
+                          isCurrent
+                            ? 'bg-neutral-900 text-white border-amber-500/80 shadow-lg ring-2 ring-amber-500/30'
+                            : p.badge
+                              ? 'bg-white text-neutral-900 border-amber-500/50 shadow-md'
+                              : 'bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300'
+                        }`}
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className={`font-black text-sm uppercase tracking-wider ${isCurrent ? 'text-amber-400' : 'text-neutral-900'}`}>
+                              {p.name}
+                            </span>
+                            {isCurrent ? (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-500 text-neutral-950 text-[10px] font-black uppercase tracking-wider">
+                                Current
+                              </span>
+                            ) : p.badge ? (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 text-[10px] font-bold border border-amber-500/30">
+                                {p.badge}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-2xl sm:text-3xl font-black font-mono">
+                                ₦{price.toLocaleString()}
+                              </span>
+                              <span className={`text-[11px] font-medium ${isCurrent ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                                {periodLabel}
+                              </span>
+                            </div>
+                            {billingCycle === 'annual' && p.annualIncentive && (
+                              <p className="text-[10px] text-amber-400 font-bold mt-1">
+                                🎁 {p.annualIncentive}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className={`p-2 rounded-xl text-xs font-semibold ${isCurrent ? 'bg-neutral-950 text-neutral-300' : 'bg-neutral-50 text-neutral-700'}`}>
+                            {p.maxTables ? `Up to ${p.maxTables} Tables Max` : '⚡ Single Walk-up Counter (Unlimited Scans)'}
+                          </div>
+
+                          <p className={`text-[11px] leading-relaxed ${isCurrent ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                            {p.tagline}
+                          </p>
+
+                          <div className="space-y-1.5 pt-2 border-t border-neutral-100/10">
+                            {p.features.map((feat, idx) => (
+                              <div key={idx} className="flex items-start gap-2 text-[11px]">
+                                <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isCurrent ? 'text-amber-400' : 'text-emerald-600'}`} />
+                                <span className={isCurrent ? 'text-neutral-300' : 'text-neutral-700'}>{feat}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="pt-5 mt-4 border-t border-neutral-100/10">
+                          {isCurrent ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="w-full py-2.5 bg-neutral-800 text-neutral-400 font-bold rounded-xl text-xs cursor-default flex items-center justify-center gap-1.5"
+                            >
+                              <Check className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Current Active Plan</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={switchingPlan !== null}
+                              onClick={() => handleSwitchPlan(p.id)}
+                              className={`w-full py-2.5 font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer ${
+                                p.badge
+                                  ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950'
+                                  : 'bg-neutral-900 hover:bg-neutral-800 text-white'
+                              }`}
+                            >
+                              {switchingPlan === p.id ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              )}
+                              <span>Switch to {p.name}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Add-On Features & Hardware Section */}
+              <div className="pt-6 border-t border-neutral-200 space-y-4">
+                <div>
+                  <h3 className="font-extrabold text-neutral-900 text-base flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-amber-500" />
+                    <span>Venue Hardware & Platform Add-ons</span>
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    Boost guest orders and staff efficiency with optional hardware cards and feature upgrades.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Addon 1: Smart Cards */}
+                  <div className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-xs flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                        <CreditCard className="w-5 h-5" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-neutral-900 text-sm">Table NFC Cards & Stands</h4>
+                        <span className="font-mono font-bold text-xs text-amber-600">₦7,000 / unit</span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed">
+                        Custom-encoded NTAG213 Smart NFC Cards and acrylic table stands with your brand logo & table QR.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsOrderCardsOpen(true)}
+                      className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white font-bold rounded-xl text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Order Smart Cards & Stands</span>
+                    </button>
+                  </div>
+
+                  {/* Addon 2: Staff NFC Attribution */}
+                  <div className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-xs flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-neutral-900 text-sm">Staff NFC & Anti-Fraud</h4>
+                        <span className="font-mono font-bold text-xs text-purple-600">₦5,000 / mo</span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed">
+                        24-Hour rotating anti-fraud daily access codes, salesperson shift leaderboards, and automated commission ledger.
+                      </p>
+                    </div>
+                    <a
+                      href="https://wa.me/2348000000000?text=Hello!%20I%20want%20to%20activate%20Staff%20NFC%20Attribution%20Add-on%20for%20my%20venue."
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold rounded-xl text-xs transition-all border border-purple-200 flex items-center justify-center gap-1.5"
+                    >
+                      <span>Inquire / Activate</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+
+                  {/* Addon 3: Multi-Branch & Chain Manager */}
+                  <div className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-xs flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                        <Store className="w-5 h-5" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-neutral-900 text-sm">Multi-Branch Locations</h4>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700">Included in Standard+</span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed">
+                        Connect secondary stalls, food trucks, or new dining locations under one master owner login.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsMultiStoreOpen(true)}
+                      className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold rounded-xl text-xs transition-all border border-blue-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Manage Branches</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </main>
       </div>
 
@@ -2855,6 +3308,25 @@ export const RestaurantDashboard: React.FC = () => {
                 >
                   <Settings className="w-4 h-4 shrink-0" />
                   <span>Settings</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('plan'); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                    activeTab === 'plan'
+                      ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <CreditCard className="w-4 h-4 shrink-0" />
+                    <span>Plan & Add-ons</span>
+                  </div>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                    activeTab === 'plan' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
+                  }`}>
+                    {(activeRestaurant.plan || (isVendor ? 'vendor' : 'basic')).toUpperCase()}
+                  </span>
                 </button>
               </nav>
 
