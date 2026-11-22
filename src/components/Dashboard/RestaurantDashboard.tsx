@@ -2018,7 +2018,7 @@ export const RestaurantDashboard: React.FC = () => {
         {/* ========================================================= */}
         {activeTab === 'archive' && (
           <KitchenArchiveView 
-            orders={restaurantOrders} 
+            orders={restaurantOrders.filter(o => o.status === 'served')} 
             restaurant={activeRestaurant} 
             onPrintOrderReceipt={handlePrintTicket} 
           />
@@ -2240,56 +2240,16 @@ export const RestaurantDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* ── Service Mode ── */}
+              {/* ── Service Mode (Read-only — determined at sign-up) ── */}
               <div>
                 <label className="block font-bold text-neutral-600 mb-1">Service Mode</label>
-                {isVendor ? (
-                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">⚡</span>
-                      <span className="font-bold text-xs text-amber-900">Counter / Street Vendor Mode</span>
-                    </div>
-                    <p className="text-[11px] text-amber-700 leading-relaxed">
-                      Your orders go directly to your kitchen display for pickup or delivery. Full table management with QR per table is reserved for Restaurant accounts.
-                    </p>
+                <div className={`p-3.5 rounded-xl border flex items-center gap-3 ${isVendor ? 'bg-amber-50 border-amber-200' : 'bg-neutral-50 border-neutral-200'}`}>
+                  <span className="text-xl">{isVendor ? '⚡' : '🍽️'}</span>
+                  <div>
+                    <div className="font-bold text-xs text-neutral-900">{isVendor ? 'Counter / Vendor Mode' : 'Table Service Mode'}</div>
+                    <div className="text-[11px] text-neutral-500 mt-0.5">Service mode is locked to your account type. Contact support to change it.</div>
                   </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => updateRestaurantMeta({ serviceMode: 'table_service' } as any)}
-                        className={`p-3 rounded-xl border-2 text-left transition-all ${
-                          (activeRestaurant as any).serviceMode !== 'counter_only'
-                            ? 'border-neutral-900 bg-neutral-900 text-white'
-                            : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-400'
-                        }`}
-                      >
-                        <div className="text-base mb-0.5">🍽️</div>
-                        <div className="font-bold text-xs">Table Service</div>
-                        <div className="text-[10px] opacity-70">Multiple tables, waiter calls, QR per table</div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateRestaurantMeta({ serviceMode: 'counter_only' } as any)}
-                        className={`p-3 rounded-xl border-2 text-left transition-all ${
-                          (activeRestaurant as any).serviceMode === 'counter_only'
-                            ? 'border-amber-500 bg-amber-500 text-white'
-                            : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-amber-300'
-                        }`}
-                      >
-                        <div className="text-base mb-0.5">⚡</div>
-                        <div className="font-bold text-xs">Counter Mode</div>
-                        <div className="text-[10px] opacity-70">Single QR link, all orders go to counter</div>
-                      </button>
-                    </div>
-                    {(activeRestaurant as any).serviceMode === 'counter_only' && (
-                      <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900">
-                        ⚡ <strong>Counter mode active.</strong> Share your menu link <span className="font-mono bg-amber-100 px-1 rounded">/?r={activeRestaurant.slug}</span> — no table selection needed. All orders go straight to the kitchen.
-                      </div>
-                    )}
-                  </>
-                )}
+                </div>
               </div>
 
               {/* ── Restaurant Bank Details for Direct Customer Transfers ── */}

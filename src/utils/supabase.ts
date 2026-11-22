@@ -435,7 +435,7 @@ export async function registerRestaurant(data: {
           name: data.name.trim(),
           slug: cleanSlug,
           tagline: data.tagline?.trim() || 'Kitchen & Bar',
-          logo: data.logo || 'ðŸ›¡ï¸',
+          logo: data.logo || '🍽️',
           currency: data.currency || '₦',
           plan: initialPlan,
           table_limit: initialTableLimit,
@@ -454,7 +454,7 @@ export async function registerRestaurant(data: {
             name: data.name.trim(),
             slug: cleanSlug,
             tagline: data.tagline?.trim() || 'Kitchen & Bar',
-            logo: data.logo || 'ðŸ›¡ï¸',
+            logo: data.logo || '🍽️',
             currency: data.currency || '₦',
           }
         ]);
@@ -479,7 +479,7 @@ export async function registerRestaurant(data: {
     name: data.name.trim(),
     slug: cleanSlug,
     tagline: data.tagline?.trim() || 'Kitchen & Bar',
-    logo: data.logo || 'ðŸ›¡ï¸',
+    logo: data.logo || '🍽️',
     currency: data.currency || '₦',
     cover_color: coverColor,
     plan: initialPlan,

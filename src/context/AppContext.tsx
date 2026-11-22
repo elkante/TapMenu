@@ -130,7 +130,7 @@ const EMPTY_RESTAURANT: RestaurantTenant = {
   slug: '',
   name: 'Restaurant Menu',
   tagline: 'Kitchen & Bar',
-  logo: 'ðŸ›¡ï¸',
+  logo: '🍽️',
   coverImage: '',
   address: '',
   phone: '',
@@ -372,7 +372,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         slug: requestedSlug,
         name: humanizedName || 'Restaurant Menu',
         tagline: 'Fresh Kitchen & Bar',
-        logo: 'ðŸ½ï¸',
+        logo: '🍽️',
         pages: []
       };
     }
@@ -430,10 +430,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (!isMounted) return;
           const { type, order, call, orderId, status } = event.data || {};
           if (type === 'NEW_ORDER' && order) {
+            // Only handle orders for THIS restaurant (prevents cross-restaurant bleed in same browser)
+            const orderRestId = order.restaurantId;
+            if (orderRestId && targetRestId && orderRestId !== targetRestId && orderRestId !== targetSlug) return;
             setOrders(prev => {
               if (prev.some(o => o.id === order.id)) return prev;
               triggerKitchenAlert({
-                title: `ðŸ½ï¸ New Order (Table ${order.tableNumber})`,
+                title: `🍽️ New Order (Table ${order.tableNumber})`,
                 body: (order.items || []).map((i: any) => `${i?.quantity || 1}x ${i?.foodItem?.name || i?.name || 'Item'}`).join(', '),
                 type: 'order',
                 tableNumber: order.tableNumber,
@@ -443,10 +446,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } else if (type === 'ORDER_STATUS_UPDATE' && orderId) {
             setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
           } else if (type === 'NEW_WAITER_CALL' && call) {
+            // Only handle calls for THIS restaurant
+            const callRestId = call.restaurantId;
+            if (callRestId && targetRestId && callRestId !== targetRestId && callRestId !== targetSlug) return;
             setWaiterCalls(prev => {
               if (prev.some(c => c.id === call.id)) return prev;
               triggerKitchenAlert({
-                title: `ðŸ›Žï¸ Table ${call.tableNumber} Calling Waiter!`,
+                title: `🛎️ Table ${call.tableNumber} Calling Waiter!`,
                 body: `Table ${call.tableNumber} requested assistance (${call.reason || 'Service'}).`,
                 type: 'waiter',
                 tableNumber: call.tableNumber,
@@ -526,7 +532,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               setOrders(prev => {
                 if (prev.some(o => o.id === incoming.id)) return prev;
                 triggerKitchenAlert({
-                  title: `ðŸ½ï¸ New Order (${incoming.tableNumber || 'Table'})`,
+                  title: `🍽️ New Order (${incoming.tableNumber || 'Table'})`,
                   body: (incoming.items || []).map((i: any) => `${i?.quantity || 1}x ${i?.foodItem?.name || i?.name || 'Item'}`).join(', '),
                   type: 'order',
                   tableNumber: incoming.tableNumber,
@@ -544,7 +550,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               setWaiterCalls(prev => {
                 if (prev.some(c => c.id === incoming.id)) return prev;
                 triggerKitchenAlert({
-                  title: `ðŸ›Žï¸ Table ${incoming.tableNumber} Calling Waiter!`,
+                  title: `🛎️ Table ${incoming.tableNumber} Calling Waiter!`,
                   body: `Table ${incoming.tableNumber} requested assistance (${incoming.reason || 'Service'}).`,
                   type: 'waiter',
                   tableNumber: incoming.tableNumber,
@@ -639,7 +645,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setOrders(prev => {
                   if (prev.some(o => o.id === mapped.id)) return prev;
                   triggerKitchenAlert({
-                    title: `ðŸ½ï¸ New Order (Table ${mapped.tableNumber})`,
+                    title: `🍽️ New Order (Table ${mapped.tableNumber})`,
                     body: (mapped.items || []).map((i: any) => `${i?.quantity || 1}x ${i?.foodItem?.name || i?.name || 'Item'}`).join(', '),
                     type: 'order',
                     tableNumber: mapped.tableNumber,
@@ -676,7 +682,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setWaiterCalls(prev => {
                   if (prev.some(c => c.id === mapped.id)) return prev;
                   triggerKitchenAlert({
-                    title: `ðŸ›Žï¸ Table ${mapped.tableNumber} Calling Waiter!`,
+                    title: `🛎️ Table ${mapped.tableNumber} Calling Waiter!`,
                     body: `Table ${mapped.tableNumber} requested assistance (${mapped.reason || 'Service'}).`,
                     type: 'waiter',
                     tableNumber: mapped.tableNumber,

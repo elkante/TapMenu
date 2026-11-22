@@ -563,55 +563,16 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
 </html>
     `;
 
-    // Render into an isolated hidden iframe and trigger print directly
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    try {
-      const doc = iframe.contentWindow?.document || iframe.contentDocument;
-      if (doc) {
-        doc.open();
-        doc.write(htmlContent);
-        doc.close();
-
-        setTimeout(() => {
-          try {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-          } catch (e) {
-            console.error('Iframe print failed, falling back to popup window', e);
-            const win = window.open('', '_blank');
-            if (win) {
-              win.document.write(htmlContent);
-              win.document.close();
-              win.focus();
-              win.print();
-            }
-          } finally {
-            setTimeout(() => {
-              try {
-                document.body.removeChild(iframe);
-              } catch {}
-            }, 2000);
-          }
-        }, 350);
-      }
-    } catch (err) {
-      console.error('Failed to write to print iframe', err);
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(htmlContent);
-        win.document.close();
-        win.focus();
-        win.print();
-      }
-    }
+    // Direct download: generate HTML blob and trigger browser download (no print dialog)
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `tapmenu_ledger_${slug}_${timeframeLabel}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
   };
 
   return (
@@ -730,14 +691,14 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
             <span>Export CSV</span>
           </button>
 
-          {/* SEPARATE BUTTON 2: EXPORT PDF LEDGER */}
+          {/* SEPARATE BUTTON 2: DOWNLOAD LEDGER */}
           <button
             onClick={handleExportPdfLedger}
             className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
-            title="Generate & print official financial audit ledger PDF for this timeframe"
+            title="Download financial ledger as a file (open in browser and Ctrl+P → Save as PDF)"
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Export PDF Ledger</span>
+            <span>Download Ledger</span>
           </button>
         </div>
       </div>
