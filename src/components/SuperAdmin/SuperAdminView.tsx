@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { RestaurantTenant } from '../../types';
 import { sanitizeRestaurantLogo } from '../../utils/logoSanitizer';
@@ -130,6 +130,7 @@ export const SuperAdminView: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [newPlan, setNewPlan] = useState<'Basic' | 'Standard' | 'Premium' | 'Enterprise' | 'Vendor'>('Standard');
   const [qrModalTenant, setQrModalTenant] = useState<RestaurantTenant | null>(null);
+  const [selectedTableIdx, setSelectedTableIdx] = useState<number>(0);
 
   // Load all restaurants from Supabase (merging local cache)
   const loadAllTenants = async () => {
@@ -454,7 +455,7 @@ export const SuperAdminView: React.FC = () => {
   // Platform Metrics
   const totalRestaurants = tenants.length;
   const totalTenants = tenants.length;
-  const totalTables = tenants.reduce((acc, t) => acc + (t.tables?.length || 0), 0);
+  const totalTables = tenants.filter(t => !isVendorTenant(t)).reduce((acc, t) => acc + (t.tables?.length || 0), 0);
   const totalDishes = tenants.reduce((acc, t) => 
     acc + t.pages.reduce((pAcc, p) => pAcc + p.items.length, 0), 0
   );
@@ -1060,7 +1061,10 @@ export const SuperAdminView: React.FC = () => {
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
-                                onClick={() => setQrModalTenant(t)}
+                                onClick={() => {
+                                  setQrModalTenant(t);
+                                  setSelectedTableIdx(0);
+                                }}
                                 className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg font-bold text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
                                 title="View and download QR codes and customer links"
                               >
@@ -1251,7 +1255,10 @@ export const SuperAdminView: React.FC = () => {
                     {/* Card Actions */}
                     <div className="flex items-center gap-2 pt-1">
                       <button
-                        onClick={() => setQrModalTenant(t)}
+                        onClick={() => {
+                          setQrModalTenant(t);
+                          setSelectedTableIdx(0);
+                        }}
                         className="py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
                       >
                         <QrCode className="w-3.5 h-3.5" />
@@ -2112,30 +2119,37 @@ export const SuperAdminView: React.FC = () => {
       {/* ── Admin QR & Links Popup Modal ── */}
       {qrModalTenant && (() => {
         const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tapmenu.me';
-        const isVendorTenant = qrModalTenant.plan === 'vendor' || qrModalTenant.serviceMode === 'counter_only';
+        const isVendorModal = qrModalTenant.plan === 'vendor' ||
+          qrModalTenant.plan === 'vendor-monthly' ||
+          qrModalTenant.plan === 'vendor-pro' ||
+          qrModalTenant.serviceMode === 'counter_only';
         const primaryMenuUrl = `${origin}/?r=${qrModalTenant.slug}`;
-        const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(primaryMenuUrl)}`;
 
-        const downloadQr = async () => {
+        const downloadTableQr = async (url: string, label: string) => {
+          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(url)}`;
           try {
-            const resp = await fetch(qrImageUrl);
+            const resp = await fetch(qrUrl);
             const blob = await resp.blob();
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = blobUrl;
-            a.download = `${qrModalTenant.slug}-menu-qr.png`;
+            a.download = `${qrModalTenant.slug}-${label.replace(/\s+/g, '-').toLowerCase()}-qr.png`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            showNotification('QR code downloaded!');
+            showNotification(`QR for ${label} downloaded!`);
           } catch {
-            window.open(qrImageUrl, '_blank');
+            window.open(qrUrl, '_blank');
           }
         };
 
+        const tables = qrModalTenant.tables || [];
+
         return (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-neutral-900 border border-neutral-750 w-full max-w-lg rounded-3xl p-5 shadow-2xl space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+            <div className="bg-neutral-900 border border-neutral-750 w-full max-w-2xl rounded-3xl p-5 shadow-2xl space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+
+              {/* Header */}
               <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
@@ -2143,7 +2157,10 @@ export const SuperAdminView: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-extrabold text-white text-sm sm:text-base">{qrModalTenant.name}</h3>
-                    <p className="text-[11px] text-neutral-400 font-mono">slug: {qrModalTenant.slug} · {isVendorTenant ? 'Vendor' : 'Restaurant'}</p>
+                    <p className="text-[11px] text-neutral-400 font-mono">
+                      slug: {qrModalTenant.slug} · {isVendorModal ? '⚡ Street Vendor' : '🍽️ Restaurant'}
+                      {!isVendorModal && tables.length > 0 && ` · ${tables.length} tables`}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -2154,21 +2171,7 @@ export const SuperAdminView: React.FC = () => {
                 </button>
               </div>
 
-              {/* QR Image & Download */}
-              <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-inner border border-neutral-200">
-                <img src={qrImageUrl} alt="QR Code" className="w-44 h-44 rounded-lg object-contain" />
-                <span className="text-[10px] text-neutral-500 font-mono mt-2">Scan to open digital menu</span>
-                <button
-                  type="button"
-                  onClick={downloadQr}
-                  className="mt-3 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Download QR Image (PNG)</span>
-                </button>
-              </div>
-
-              {/* Main Menu Link */}
+              {/* Primary menu link row (always shown) */}
               <div className="space-y-1">
                 <label className="font-bold text-neutral-400 uppercase tracking-wider text-[10px]">Primary Menu Link</label>
                 <div className="flex items-center gap-2 p-2 bg-neutral-950 rounded-xl border border-neutral-800">
@@ -2177,7 +2180,7 @@ export const SuperAdminView: React.FC = () => {
                     type="button"
                     onClick={() => {
                       navigator.clipboard.writeText(primaryMenuUrl);
-                      showNotification('Menu link copied to clipboard!');
+                      showNotification('Menu link copied!');
                     }}
                     className="px-3 py-1 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg font-bold text-[11px] shrink-0 cursor-pointer"
                   >
@@ -2186,35 +2189,134 @@ export const SuperAdminView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Table Links list if Restaurant */}
-              {!isVendorTenant && qrModalTenant.tables && qrModalTenant.tables.length > 0 && (
-                <div className="space-y-1.5">
+              {/* VENDOR: single counter QR */}
+              {isVendorModal && (
+                <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-2xl border border-neutral-200 shadow-inner">
+                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">⚡ Single Counter Walk-up QR</span>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(primaryMenuUrl)}`}
+                    alt="Counter QR"
+                    className="w-44 h-44 rounded-lg object-contain"
+                  />
+                  <span className="text-[10px] text-neutral-500 font-mono">Scan to open digital menu</span>
+                  <button
+                    type="button"
+                    onClick={() => downloadTableQr(primaryMenuUrl, 'counter')}
+                    className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 text-amber-400" />
+                    Download Counter QR (PNG)
+                  </button>
+                </div>
+              )}
+
+              {/* RESTAURANT: per-table QR grid */}
+              {!isVendorModal && (
+                <div className="space-y-3">
                   <label className="font-bold text-neutral-400 uppercase tracking-wider text-[10px]">
-                    Table Direct Links ({qrModalTenant.tables.length})
+                    {tables.length > 0 ? `Per-Table QR Codes (${tables.length} tables)` : 'Table QR Codes'}
                   </label>
-                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-                    {qrModalTenant.tables.map(tbl => {
-                      const tableUrl = `${origin}/?r=${qrModalTenant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
-                      return (
-                        <div key={tbl.id} className="flex items-center justify-between p-2 bg-neutral-950/60 rounded-xl border border-neutral-850">
-                          <span className="font-mono font-bold text-white text-[11px]">{tbl.tableNumber}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-neutral-400 text-[10px] truncate max-w-[150px]">{tableUrl}</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(tableUrl);
-                                showNotification(`${tbl.tableNumber} link copied!`);
-                              }}
-                              className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 rounded font-bold text-[10px] cursor-pointer"
-                            >
-                              Copy
-                            </button>
+
+                  {tables.length === 0 ? (
+                    <div className="text-neutral-500 text-center py-6 bg-neutral-950 rounded-2xl border border-neutral-800">
+                      No tables configured yet. Add tables in the restaurant settings.
+                    </div>
+                  ) : (
+                    <>
+                      {/* Tab strip for table selection */}
+                      <div className="flex gap-1.5 flex-wrap">
+                        {tables.map((tbl, idx) => (
+                          <button
+                            key={tbl.id}
+                            type="button"
+                            onClick={() => setSelectedTableIdx(idx)}
+                            className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
+                              selectedTableIdx === idx
+                                ? 'bg-amber-500 text-black shadow-md'
+                                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'
+                            }`}
+                          >
+                            {tbl.tableNumber}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Selected table QR */}
+                      {tables[selectedTableIdx] && (() => {
+                        const tbl = tables[selectedTableIdx];
+                        const tableUrl = `${origin}/?r=${qrModalTenant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
+                        const tableQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(tableUrl)}`;
+                        return (
+                          <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-2xl border border-neutral-200 shadow-inner">
+                            <span className="text-[11px] font-extrabold text-neutral-800 uppercase tracking-widest">{tbl.tableNumber}</span>
+                            <img
+                              src={tableQrUrl}
+                              alt={`QR for ${tbl.tableNumber}`}
+                              className="w-48 h-48 rounded-lg object-contain"
+                            />
+                            <span className="text-[10px] text-neutral-500 font-mono break-all text-center max-w-xs">{tableUrl}</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => downloadTableQr(tableUrl, tbl.tableNumber)}
+                                className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Download className="w-3.5 h-3.5 text-amber-400" />
+                                Download QR (PNG)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(tableUrl);
+                                  showNotification(`${tbl.tableNumber} link copied!`);
+                                }}
+                                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-amber-300 font-bold rounded-xl text-[11px] cursor-pointer"
+                              >
+                                Copy Link
+                              </button>
+                            </div>
                           </div>
+                        );
+                      })()}
+
+                      {/* All-tables compact list */}
+                      <div className="space-y-1">
+                        <label className="font-bold text-neutral-500 uppercase tracking-wider text-[10px]">All Table Links</label>
+                        <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                          {tables.map((tbl, idx) => {
+                            const tableUrl = `${origin}/?r=${qrModalTenant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
+                            return (
+                              <div
+                                key={tbl.id}
+                                className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-colors ${
+                                  selectedTableIdx === idx
+                                    ? 'bg-amber-500/10 border-amber-500/30'
+                                    : 'bg-neutral-950/60 border-neutral-800 hover:border-neutral-700'
+                                }`}
+                                onClick={() => setSelectedTableIdx(idx)}
+                              >
+                                <span className="font-mono font-bold text-white text-[11px]">{tbl.tableNumber}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-neutral-500 text-[10px] truncate max-w-[140px]">{tableUrl}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigator.clipboard.writeText(tableUrl);
+                                      showNotification(`${tbl.tableNumber} link copied!`);
+                                    }}
+                                    className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 rounded font-bold text-[10px] cursor-pointer"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 

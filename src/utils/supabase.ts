@@ -255,42 +255,54 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
     });
   }
 
-  // Preserve user-generated tables across logouts & refreshes
-  let tables: any[] = [];
-  if (Array.isArray(rRow.tables) && rRow.tables.length > 0) {
-    tables = rRow.tables;
-  } else if (localMatch?.tables && localMatch.tables.length > 0) {
-    tables = localMatch.tables;
-  } else {
-    try {
-      const dedicated = typeof localStorage !== 'undefined' 
-        ? (localStorage.getItem(`tapmenu_tables_${rRow.id}`) || localStorage.getItem(`tapmenu_tables_${rRow.slug}`))
-        : null;
-      if (dedicated) {
-        const parsed = JSON.parse(dedicated);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          tables = parsed;
-        }
-      }
-    } catch {}
-  }
-
-  // Fallback to initial 5 tables only if brand new restaurant
-  if (tables.length === 0) {
-    tables = [1, 2, 3, 4, 5].map(num => ({
-      id: `tbl-${rRow.id}-${num}`,
-      tableNumber: `Table ${num}`,
-      label: `Table ${num}`,
-      section: 'Dining Area',
-      ntagSerial: `04:FA:${num.toString().padStart(2, '0')}:88:22:90:${num.toString().padStart(2, '0')}`,
-      nfcStatus: 'active' as const,
-      totalTaps: 0,
-      totalScans: 0,
-      urlPayload: `${origin}/?r=${rRow.slug}&table=Table+${num}`
-    }));
-  }
-
   const designObj = (typeof rRow.design === 'object' && rRow.design !== null) ? rRow.design : {};
+  const isVendor = rRow.plan === 'vendor' || 
+                   rRow.plan === 'vendor-monthly' || 
+                   rRow.plan === 'vendor-pro' || 
+                   rRow.service_mode === 'counter_only' || 
+                   designObj.plan === 'vendor' || 
+                   designObj.serviceMode === 'counter_only' ||
+                   localMatch?.plan === 'vendor' ||
+                   localMatch?.serviceMode === 'counter_only';
+
+  // Preserve user-generated tables across logouts & refreshes (Dine-in only)
+  let tables: any[] = [];
+  if (isVendor) {
+    tables = [];
+  } else {
+    if (Array.isArray(rRow.tables) && rRow.tables.length > 0) {
+      tables = rRow.tables;
+    } else if (localMatch?.tables && localMatch.tables.length > 0) {
+      tables = localMatch.tables;
+    } else {
+      try {
+        const dedicated = typeof localStorage !== 'undefined' 
+          ? (localStorage.getItem(`tapmenu_tables_${rRow.id}`) || localStorage.getItem(`tapmenu_tables_${rRow.slug}`))
+          : null;
+        if (dedicated) {
+          const parsed = JSON.parse(dedicated);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            tables = parsed;
+          }
+        }
+      } catch {}
+    }
+
+    // Fallback to initial 5 tables only for dine-in restaurants
+    if (tables.length === 0) {
+      tables = [1, 2, 3, 4, 5].map(num => ({
+        id: `tbl-${rRow.id}-${num}`,
+        tableNumber: `Table ${num}`,
+        label: `Table ${num}`,
+        section: 'Dining Area',
+        ntagSerial: `04:FA:${num.toString().padStart(2, '0')}:88:22:90:${num.toString().padStart(2, '0')}`,
+        nfcStatus: 'active' as const,
+        totalTaps: 0,
+        totalScans: 0,
+        urlPayload: `${origin}/?r=${rRow.slug}&table=Table+${num}`
+      }));
+    }
+  }
   const coverColor = rRow.cover_color || designObj.coverColor || designObj.primaryColor || localMatch?.design?.coverColor || '#0c2e22';
   const coverTextColor = rRow.cover_text_color || designObj.coverTextColor || localMatch?.design?.coverTextColor || '#D4AF37';
   const accentColor = rRow.accent_color || designObj.accentColor || localMatch?.design?.accentColor || '#d4af37';
@@ -315,11 +327,11 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
     address: rRow.address || localMatch?.address || '',
     phone: rRow.phone || localMatch?.phone || '',
     openingHours: rRow.opening_hours || localMatch?.openingHours || '10:00 AM - 10:00 PM',
-    plan: rRow.plan || designObj.plan || localMatch?.plan || 'basic',
-    tableLimit: (rRow.table_limit !== undefined && rRow.table_limit !== null) ? Number(rRow.table_limit) : undefined,
+    plan: isVendor ? (rRow.plan || designObj.plan || 'vendor') : (rRow.plan || designObj.plan || localMatch?.plan || 'basic'),
+    tableLimit: isVendor ? undefined : ((rRow.table_limit !== undefined && rRow.table_limit !== null) ? Number(rRow.table_limit) : undefined),
     status: (rRow.status as any) || 'active',
     ownerEmail: rRow.email || rRow.owner_email || localMatch?.ownerEmail || (rRow.owner_id ? undefined : `admin@${rRow.slug}.com`),
-    serviceMode: rRow.service_mode || designObj.serviceMode || (rRow.plan === 'vendor' || designObj.plan === 'vendor' ? 'counter_only' : (localMatch?.serviceMode || 'table_service')),
+    serviceMode: isVendor ? 'counter_only' : (rRow.service_mode || designObj.serviceMode || localMatch?.serviceMode || 'table_service'),
     packagingFeePerPack: rRow.packaging_fee !== undefined ? Number(rRow.packaging_fee) : (designObj.packagingFeePerPack ?? localMatch?.packagingFeePerPack ?? 500),
     deliveryFee: rRow.delivery_fee !== undefined ? Number(rRow.delivery_fee) : (designObj.deliveryFee ?? localMatch?.deliveryFee ?? 1000),
     bankName: rRow.bank_name || designObj.bankName || localMatch?.bankName || '',
@@ -1174,10 +1186,10 @@ export async function fetchAllRestaurantsFromSupabase(): Promise<RestaurantTenan
 
         const dbRestaurants = rRows.map(r => {
           const mapped = mapDbRowToRestaurant(r, itemsByRestId[r.id] || []);
-          // Check local cache for client-side plan / limit overrides
+          // Check local cache for client-side plan / limit overrides (only if unset in Supabase)
           const cached = localList.find(c => c.id === r.id || c.slug === r.slug);
           if (cached) {
-            if (cached.plan && !r.plan) mapped.plan = cached.plan;
+            if (cached.plan && !r.plan && !r.design?.plan) mapped.plan = cached.plan;
             if (cached.tableLimit !== undefined && r.table_limit === undefined) mapped.tableLimit = cached.tableLimit;
           }
           return mapped;
