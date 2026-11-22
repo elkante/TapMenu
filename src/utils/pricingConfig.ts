@@ -1,6 +1,7 @@
 export interface PlanTier {
   id: string;
   name: string;
+  category?: 'restaurant' | 'vendor';
   badge?: string;
   monthlyPrice: number; // in NGN
   annualPrice: number;  // in NGN
@@ -11,10 +12,56 @@ export interface PlanTier {
   recommended?: boolean;
 }
 
+export const DEFAULT_VENDOR_PLANS: PlanTier[] = [
+  {
+    id: 'vendor-monthly',
+    name: 'Vendor Monthly',
+    category: 'vendor',
+    monthlyPrice: 4000,
+    annualPrice: 40000,
+    maxTables: null,
+    tagline: 'Ideal for retail pop-ups, food stalls, bakeries & event vendors',
+    annualIncentive: 'Save ₦8,000 (2 Mos Free) + 2 Free NFC Counter Stands (₦14,000 value)',
+    features: [
+      'Single Counter / Pop-Up Stand Menu',
+      'Realistic 3D Flipbook Digital Showcase',
+      'Custom Vendor URL Slug & QR Stand Code',
+      'Instant Tap-to-Order for Walk-Up Customers',
+      'Direct Bank Transfer & Cash POS Tracking',
+      'Instant Sold-Out Item Toggle in 3 Seconds',
+      'Daily Sales Volume & Performance Summary',
+      'Standard WhatsApp & Email Support'
+    ]
+  },
+  {
+    id: 'vendor-pro',
+    name: 'Vendor Pro',
+    category: 'vendor',
+    badge: 'Popular',
+    monthlyPrice: 7500,
+    annualPrice: 75000,
+    maxTables: null,
+    tagline: 'For high-volume vendors, multi-stall setups & busy retail markets',
+    annualIncentive: 'Save ₦15,000 (2 Mos Free) + 5 Free NFC Counter Stands (₦35,000 value)',
+    features: [
+      'Everything in Vendor Monthly',
+      'Multi-Stall / Multi-Location Booth Sync',
+      'Salesperson & Server NFC Card Attribution Ready',
+      '24-Hour Rotating Anti-Fraud Daily Access Codes',
+      'Automated Staff Commission & Tip Tracking',
+      'Live Shift Leaderboard & Sales Volume Rankings',
+      'Exportable CSV / PDF Sales & Commission Reports',
+      'Priority Phone & Dedicated Account Manager'
+    ],
+    recommended: true
+  }
+];
+
 export const DEFAULT_PLANS: PlanTier[] = [
   {
     id: 'basic',
     name: 'Basic',
+    category: 'restaurant',
     monthlyPrice: 8000,
     annualPrice: 80000,
     maxTables: 10,
@@ -34,6 +81,7 @@ export const DEFAULT_PLANS: PlanTier[] = [
   {
     id: 'standard',
     name: 'Standard',
+    category: 'restaurant',
     badge: 'Popular',
     monthlyPrice: 13000,
     annualPrice: 130000,
@@ -55,6 +103,7 @@ export const DEFAULT_PLANS: PlanTier[] = [
   {
     id: 'premium',
     name: 'Premium',
+    category: 'restaurant',
     badge: 'High Volume',
     monthlyPrice: 21000,
     annualPrice: 210000,
@@ -74,6 +123,7 @@ export const DEFAULT_PLANS: PlanTier[] = [
   {
     id: 'enterprise',
     name: 'Enterprise',
+    category: 'restaurant',
     badge: 'Unlimited',
     monthlyPrice: 35000,
     annualPrice: 350000,
@@ -96,6 +146,7 @@ import { savePlatformSettingsToSupabase, fetchPlatformSettingsFromSupabase } fro
 
 export const PLANS_UPDATED_EVENT = 'tapmenu_plans_updated';
 const STORAGE_KEY_PLANS = 'tapmenu_subscription_plans_v2';
+const STORAGE_KEY_VENDOR_PLANS = 'tapmenu_vendor_plans_v1';
 
 export function getStoredPlans(): PlanTier[] {
   try {
@@ -112,6 +163,21 @@ export function getStoredPlans(): PlanTier[] {
   return DEFAULT_PLANS;
 }
 
+export function getStoredVendorPlans(): PlanTier[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_VENDOR_PLANS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length >= 2) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse stored vendor plans', e);
+  }
+  return DEFAULT_VENDOR_PLANS;
+}
+
 export function saveStoredPlans(plans: PlanTier[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_PLANS, JSON.stringify(plans));
@@ -122,6 +188,18 @@ export function saveStoredPlans(plans: PlanTier[]): void {
     savePlatformSettingsToSupabase('subscription_plans', plans).catch(() => {});
   } catch (e) {
     console.warn('Failed to save plans', e);
+  }
+}
+
+export function saveStoredVendorPlans(plans: PlanTier[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_VENDOR_PLANS, JSON.stringify(plans));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(PLANS_UPDATED_EVENT, { detail: plans }));
+    }
+    savePlatformSettingsToSupabase('vendor_subscription_plans', plans).catch(() => {});
+  } catch (e) {
+    console.warn('Failed to save vendor plans', e);
   }
 }
 
@@ -140,5 +218,6 @@ export async function syncRemotePlans(): Promise<PlanTier[]> {
 
 export function resetPlansToDefault(): PlanTier[] {
   saveStoredPlans(DEFAULT_PLANS);
+  saveStoredVendorPlans(DEFAULT_VENDOR_PLANS);
   return DEFAULT_PLANS;
 }

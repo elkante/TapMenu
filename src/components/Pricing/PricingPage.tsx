@@ -11,9 +11,16 @@ import {
   X, 
   Printer, 
   CreditCard,
-  ChevronDown
+  ChevronDown,
+  ShoppingBag
 } from 'lucide-react';
-import { getStoredPlans, syncRemotePlans, PLANS_UPDATED_EVENT, PlanTier } from '../../utils/pricingConfig';
+import { 
+  getStoredPlans, 
+  getStoredVendorPlans,
+  syncRemotePlans, 
+  PLANS_UPDATED_EVENT, 
+  PlanTier 
+} from '../../utils/pricingConfig';
 
 interface PricingPageProps {
   onBackToHome: () => void;
@@ -26,13 +33,16 @@ export const PricingPage: React.FC<PricingPageProps> = ({
   onOpenSignup,
   onOpenLogin,
 }) => {
+  const [accountType, setAccountType] = useState<'restaurant' | 'vendor'>('restaurant');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [plans, setPlans] = useState<PlanTier[]>(() => getStoredPlans());
+  const [vendorPlans, setVendorPlans] = useState<PlanTier[]>(() => getStoredVendorPlans());
 
   useEffect(() => {
     const handleUpdate = () => {
       setPlans(getStoredPlans());
+      setVendorPlans(getStoredVendorPlans());
     };
     window.addEventListener('storage', handleUpdate);
     window.addEventListener(PLANS_UPDATED_EVENT, handleUpdate);
@@ -52,6 +62,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
   };
 
   const isAnnual = billingCycle === 'annual';
+  const activePlans = accountType === 'vendor' ? vendorPlans : plans;
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-stone-900 font-sans selection:bg-amber-200 selection:text-amber-950">
@@ -103,47 +114,80 @@ export const PricingPage: React.FC<PricingPageProps> = ({
 
         <h1 className="font-serif text-3xl sm:text-5xl font-black tracking-tight max-w-3xl mx-auto text-stone-900 leading-tight">
           Simple, Predictable Plans for <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-amber-600 to-amber-800 italic">Every Restaurant in Nigeria</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-amber-600 to-amber-800 italic">
+            {accountType === 'vendor' ? 'Vendors, Stalls & Pop-Up Counters' : 'Every Restaurant in Nigeria'}
+          </span>
         </h1>
 
         <p className="text-sm sm:text-base text-stone-600 max-w-2xl mx-auto mt-4 leading-relaxed">
-          No app downloads for diners. No 20–30% delivery commission deductions. Pay a simple flat monthly rate and keep 100% of your diner bills directly at the table.
+          {accountType === 'vendor'
+            ? 'Equip your retail booth, food stall, or pop-up counter with instant tap-to-order NFC cards, rotating anti-fraud codes, and automated salesperson commission tracking.'
+            : 'No app downloads for diners. No 20–30% delivery commission deductions. Pay a simple flat monthly rate and keep 100% of your diner bills directly at the table.'}
         </p>
 
-        {/* Monthly vs Annual Toggle */}
-        <div className="mt-8 inline-flex items-center p-1 bg-stone-200/70 rounded-2xl border border-stone-300">
+        {/* Business Account Type Selector: Restaurant vs Vendor */}
+        <div className="mt-7 inline-flex items-center p-1 bg-stone-200/80 rounded-2xl border border-stone-300">
           <button
-            onClick={() => setBillingCycle('monthly')}
-            className={`px-4 sm:px-6 py-2 rounded-xl text-xs font-bold transition-all ${
-              billingCycle === 'monthly'
-                ? 'bg-white text-stone-900 shadow-sm'
-                : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            Monthly Billing
-          </button>
-          <button
-            onClick={() => setBillingCycle('annual')}
-            className={`px-4 sm:px-6 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              billingCycle === 'annual'
+            onClick={() => setAccountType('restaurant')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              accountType === 'restaurant'
                 ? 'bg-[#0c2e22] text-[#D4AF37] shadow-sm'
                 : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            <span>Annual Billing</span>
-            <span className="px-2 py-0.5 rounded-md bg-amber-400 text-neutral-950 text-[10px] font-black uppercase tracking-wide">
-              2 Mos Free + Free Cards
+            <span>🍽️ Restaurant Plans</span>
+          </button>
+          <button
+            onClick={() => setAccountType('vendor')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              accountType === 'vendor'
+                ? 'bg-[#0c2e22] text-[#D4AF37] shadow-sm'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            <span>🛍️ Vendor Plans</span>
+            <span className="px-1.5 py-0.5 rounded bg-amber-400 text-stone-950 text-[10px] font-black uppercase">
+              From ₦4k
             </span>
           </button>
         </div>
+
+        {/* Monthly vs Annual Toggle */}
+        <div className="mt-4 flex justify-center">
+          <div className="inline-flex items-center p-1 bg-stone-200/70 rounded-2xl border border-stone-300">
+            <button
+              onClick={() => setBillingCycle('monthly')}
+              className={`px-4 sm:px-6 py-2 rounded-xl text-xs font-bold transition-all ${
+                billingCycle === 'monthly'
+                  ? 'bg-white text-stone-900 shadow-sm'
+                  : 'text-stone-600 hover:text-stone-900'
+              }`}
+            >
+              Monthly Billing
+            </button>
+            <button
+              onClick={() => setBillingCycle('annual')}
+              className={`px-4 sm:px-6 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                billingCycle === 'annual'
+                  ? 'bg-[#0c2e22] text-[#D4AF37] shadow-sm'
+                  : 'text-stone-600 hover:text-stone-900'
+              }`}
+            >
+              <span>Annual Billing</span>
+              <span className="px-2 py-0.5 rounded-md bg-amber-400 text-neutral-950 text-[10px] font-black uppercase tracking-wide">
+                2 Mos Free + Free Cards
+              </span>
+            </button>
+          </div>
+        </div>
       </section>
 
-      {/* Pricing Cards Grid (4 Tiers) */}
+      {/* Pricing Cards Grid */}
       <section className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
-          {plans.map((p) => {
+        <div className={`grid grid-cols-1 ${accountType === 'vendor' ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-2 lg:grid-cols-4'} gap-5 items-stretch`}>
+          {activePlans.map((p) => {
             const price = isAnnual ? p.annualPrice : p.monthlyPrice;
-            const isHighlighted = p.recommended || p.id === 'standard';
+            const isHighlighted = p.recommended || p.id === 'standard' || p.id === 'vendor-pro';
 
             return (
               <div
@@ -179,7 +223,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                           : 'bg-stone-100 text-stone-700'
                       }`}
                     >
-                      {p.maxTables ? `${p.maxTables} Tables` : 'Unlimited Tables'}
+                      {p.maxTables ? `${p.maxTables} Tables` : accountType === 'vendor' ? 'Pop-Up / Stall' : 'Unlimited Tables'}
                     </span>
                   </div>
 
@@ -238,9 +282,35 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             );
           })}
         </div>
+
+        {/* Vendor NFC Staff Attribution Add-On Spotlight Card */}
+        {accountType === 'vendor' && (
+          <div className="max-w-4xl mx-auto mt-8 bg-gradient-to-r from-[#0c2e22] via-[#123e2f] to-[#0c2e22] text-white rounded-3xl p-6 sm:p-8 border-2 border-[#D4AF37]/50 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="space-y-2 text-center sm:text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] text-[11px] font-black uppercase tracking-wider">
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>Optional Add-On Available</span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold font-serif text-white">
+                Staff NFC Card Attribution & 24-Hour Rotating Code Engine
+              </h3>
+              <p className="text-xs text-stone-300 max-w-xl leading-relaxed">
+                Give every salesperson an individual NFC card or lanyard. Built with 24-hour rotating anti-fraud verification codes, automated sales volume commission tracking, and live shift leaderboards. Included free in Vendor Pro!
+              </p>
+            </div>
+            <div className="text-center sm:text-right shrink-0">
+              <div className="text-2xl font-black font-mono text-[#D4AF37]">₦5,000</div>
+              <div className="text-[11px] text-stone-300 mb-3">/ mo add-on</div>
+              <button
+                onClick={onOpenSignup}
+                className="px-5 py-2.5 bg-[#D4AF37] hover:bg-[#e6c148] text-neutral-950 font-black rounded-xl text-xs shadow-md transition-all active:scale-95"
+              >
+                Learn More &rarr;
+              </button>
+            </div>
+          </div>
+        )}
       </section>
-
-
 
       {/* Comparison Table */}
       <section className="max-w-6xl mx-auto px-4 py-12">
@@ -249,7 +319,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             How TapMenu Compares
           </h2>
           <p className="text-xs sm:text-sm text-stone-500 mt-1">
-            Why leading Nigerian restaurateurs are swapping out paper menus and food aggregators.
+            Why leading Nigerian restaurateurs and vendors are swapping out paper menus and food aggregators.
           </p>
         </div>
 
@@ -278,7 +348,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                   <td className="p-4 sm:p-5">Slow back-office approval</td>
                 </tr>
                 <tr>
-                  <td className="p-4 sm:p-5 font-bold text-stone-900">Diner Experience</td>
+                  <td className="p-4 sm:p-5 font-bold text-stone-900">Customer Experience</td>
                   <td className="p-4 sm:p-5 font-bold text-[#0c2e22] bg-amber-50/30">Realistic 3D Leather Flipbook</td>
                   <td className="p-4 sm:p-5">Greasy paper folios</td>
                   <td className="p-4 sm:p-5">Generic utilitarian lists</td>
@@ -315,20 +385,24 @@ export const PricingPage: React.FC<PricingPageProps> = ({
         <div className="space-y-3 text-xs">
           {[
             {
-              q: 'How does table payment work? Do you take a percentage of our food sales?',
-              a: 'No. TapMenu charges ZERO commission on orders. When diners select "Card Payment", your waiter brings your normal restaurant bank POS terminal to the table. If they select "Instant Transfer", your staff gives them your account details. TapMenu is pure software to accelerate table turn and service.'
+              q: 'How does vendor pricing work vs restaurant plans?',
+              a: 'Vendor plans start at just ₦4,000/month for retail stalls, pop-ups, and market counters. If you need multi-stall synchronization and staff NFC attribution tracking, Vendor Pro is ₦7,500/month.'
+            },
+            {
+              q: 'How does payment collection work? Do you take a cut?',
+              a: 'No. TapMenu charges ZERO commission on orders. Diners or customers pay you directly via your POS terminal, cash, or instant bank transfer. You keep 100% of your revenue.'
             },
             {
               q: 'Can we change dish prices or mark items sold out during rush hours?',
-              a: 'Yes, in 3 seconds. The kitchen or manager can tap "Sold Out" on any item from their mobile phone or kitchen screen, and it immediately reflects across all live diner phones currently viewing the menu book.'
+              a: 'Yes, in 3 seconds. The kitchen or manager can tap "Sold Out" on any item from their mobile phone or kitchen screen, and it immediately reflects across all live diner phones.'
             },
             {
-              q: 'Do diners need an iPhone or NFC to view the menu?',
-              a: 'No! Every table stand card has both an instant NFC chip for modern phones AND a high-contrast QR code that works on any Android or iPhone camera.'
+              q: 'Do customers need an app to view the menu?',
+              a: 'No! Every stand or card has both an instant NFC chip for modern phones AND a high-contrast QR code that works with any standard smartphone camera.'
             },
             {
-              q: 'How do we upgrade or change plans if our restaurant expands?',
-              a: 'You can upgrade from Basic to Standard or Premium at any time as you add more dining tables, VIP lounges, or rooftop sections.'
+              q: 'How do we upgrade or change plans if our venue expands?',
+              a: 'You can upgrade at any time from your dashboard as you add more tables, retail booths, or team members.'
             }
           ].map((faq, idx) => (
             <div 
@@ -360,17 +434,17 @@ export const PricingPage: React.FC<PricingPageProps> = ({
               LAUNCH IN 60 SECONDS
             </span>
             <h2 className="font-serif text-2xl sm:text-4xl font-black text-white">
-              Give Your Guests a Luxury Dining Experience
+              {accountType === 'vendor' ? 'Start Selling with Instant NFC & QR Menus' : 'Give Your Guests a Luxury Dining Experience'}
             </h2>
             <p className="text-xs sm:text-sm text-stone-300 mt-3 leading-relaxed">
-              Create your signature digital menu book today. Test with your staff for free, then order your table cards whenever you are ready.
+              Create your signature digital menu today. Test with your team for free, then order your custom cards whenever you are ready.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
                 onClick={onOpenSignup}
                 className="w-full sm:w-auto px-8 py-3.5 bg-[#D4AF37] hover:bg-[#e6c148] text-neutral-950 font-black rounded-xl text-xs transition-all shadow-md active:scale-95"
               >
-                Create Restaurant Menu Free &rarr;
+                {accountType === 'vendor' ? 'Get Started as Vendor (From ₦4,000/mo) →' : 'Create Restaurant Menu Free →'}
               </button>
               <button
                 onClick={onBackToHome}
@@ -388,7 +462,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 font-serif font-bold text-stone-800">
             <span className="w-6 h-6 rounded-lg bg-[#0c2e22] text-[#D4AF37] flex items-center justify-center text-xs font-serif font-black">T</span>
-            <span>TapMenu Nigeria &middot; Luxury Restaurant Platform</span>
+            <span>TapMenu Nigeria &middot; Luxury Restaurant & Vendor Platform</span>
           </div>
           <div>&copy; {new Date().getFullYear()} TapMenu Inc. All rights reserved.</div>
         </div>
