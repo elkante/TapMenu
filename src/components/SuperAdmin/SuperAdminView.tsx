@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { RestaurantTenant } from '../../types';
+import { sanitizeRestaurantLogo } from '../../utils/logoSanitizer';
 import { 
   fetchAllRestaurantsFromSupabase, 
   updateRestaurantStatusInSupabase, 
@@ -789,11 +790,15 @@ export const SuperAdminView: React.FC = () => {
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-lg bg-neutral-800 border border-neutral-700 overflow-hidden flex items-center justify-center shrink-0">
-                                {t.logo && (t.logo.startsWith('data:') || t.logo.startsWith('http') || t.logo.startsWith('/')) ? (
-                                  <img src={t.logo} alt={t.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <span className="text-base">{t.logo || '🛡️'}</span>
-                                )}
+                                {(() => {
+                                  const safeLogo = sanitizeRestaurantLogo(t.logo, '🍽️');
+                                  const isImg = safeLogo.startsWith('data:') || safeLogo.startsWith('http') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
+                                  return isImg ? (
+                                    <img src={safeLogo} alt={t.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-base">{safeLogo}</span>
+                                  );
+                                })()}
                               </div>
                               <div>
                                 <div className="font-bold text-white text-sm">{t.name}</div>
@@ -957,11 +962,15 @@ export const SuperAdminView: React.FC = () => {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 overflow-hidden flex items-center justify-center shrink-0">
-                          {t.logo && (t.logo.startsWith('data:') || t.logo.startsWith('http') || t.logo.startsWith('/')) ? (
-                            <img src={t.logo} alt={t.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-xl">{t.logo || '🛡️'}</span>
-                          )}
+                          {(() => {
+                            const safeLogo = sanitizeRestaurantLogo(t.logo, '🍽️');
+                            const isImg = safeLogo.startsWith('data:') || safeLogo.startsWith('http') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
+                            return isImg ? (
+                              <img src={safeLogo} alt={t.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-xl">{safeLogo}</span>
+                            );
+                          })()}
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-bold text-white text-sm truncate">{t.name}</h4>

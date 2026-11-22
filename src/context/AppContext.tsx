@@ -15,6 +15,7 @@ import {
 import { INITIAL_RESTAURANTS, TEMPLATE_PRESETS, createDefaultRestaurantTenant } from '../data/initialData';
 import { playKitchenChime } from '../utils/audio';
 import { notifyKitchenNewTicket, setAppBadgeCount } from '../utils/pwaNotifications';
+import { sanitizeRestaurantLogo } from '../utils/logoSanitizer';
 import { 
   syncOrderToSupabase, 
   syncWaiterCallToSupabase, 
@@ -376,18 +377,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pages: []
       };
     }
+    let chosen: RestaurantTenant | null = null;
     if (ownerSession?.restaurantId || ownerSession?.restaurantSlug) {
       const owned = restaurants.find(r => 
         (ownerSession.restaurantId && r.id === ownerSession.restaurantId) ||
         (ownerSession.restaurantSlug && r.slug.toLowerCase() === ownerSession.restaurantSlug.toLowerCase())
       );
-      if (owned) return owned;
+      if (owned) chosen = owned;
     }
-    if (activeRestaurantId) {
+    if (!chosen && activeRestaurantId) {
       const found = restaurants.find(r => r.id === activeRestaurantId);
-      if (found) return found;
+      if (found) chosen = found;
     }
-    return restaurants[0] || EMPTY_RESTAURANT;
+    if (!chosen) chosen = restaurants[0] || EMPTY_RESTAURANT;
+
+    return {
+      ...chosen,
+      logo: sanitizeRestaurantLogo(chosen.logo, '🍽️')
+    };
   }, [restaurants, activeRestaurantId, isCustomerRoute, requestedSlug, ownerSession]);
 
   // Real-time synchronization: Supabase Realtime + Multi-tab BroadcastChannel + Local Storage + Polling fallback

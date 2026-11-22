@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { sanitizeRestaurantLogo } from '../../utils/logoSanitizer';
 import { setActiveSession, saveStoredRestaurants, fileToDataUrl, saveDishToSupabase, deleteDishFromSupabase, saveShiftToSupabase, syncAllDishesToSupabase } from '../../utils/supabase';
 import { generateQrDataUrl } from '../../utils/nfc';
 import { getStoredPlans } from '../../utils/pricingConfig';
@@ -937,11 +938,15 @@ export const RestaurantDashboard: React.FC = () => {
             </button>
 
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-neutral-800 border border-neutral-700/80 flex items-center justify-center overflow-hidden shrink-0">
-              {activeRestaurant.logo && (activeRestaurant.logo.startsWith('data:') || activeRestaurant.logo.startsWith('http') || activeRestaurant.logo.startsWith('/')) ? (
-                <img src={activeRestaurant.logo} alt={activeRestaurant.name} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-xl sm:text-2xl">{activeRestaurant.logo || '🍽️'}</span>
-              )}
+              {(() => {
+                const safeLogo = sanitizeRestaurantLogo(activeRestaurant.logo, '🍽️');
+                const isImg = safeLogo.startsWith('data:') || safeLogo.startsWith('http') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
+                return isImg ? (
+                  <img src={safeLogo} alt={activeRestaurant.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xl sm:text-2xl">{safeLogo}</span>
+                );
+              })()}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -2035,11 +2040,15 @@ export const RestaurantDashboard: React.FC = () => {
               <div>
                 <label className="block font-bold text-neutral-600 mb-1">Restaurant Logo</label>
                 <div className="flex items-center gap-3 p-3 bg-neutral-50 border border-neutral-200 rounded-xl mb-3">
-                  {activeRestaurant.logo && (activeRestaurant.logo.startsWith('data:') || activeRestaurant.logo.startsWith('http') || activeRestaurant.logo.startsWith('/')) ? (
-                    <img src={activeRestaurant.logo} alt={activeRestaurant.name} className="w-12 h-12 rounded-xl object-cover border border-neutral-300" />
-                  ) : (
-                    <div className="text-3xl p-1 bg-white border border-neutral-200 rounded-xl">{activeRestaurant.logo || '🍽️'}</div>
-                  )}
+                  {(() => {
+                    const safeLogo = sanitizeRestaurantLogo(activeRestaurant.logo, '🍽️');
+                    const isImg = safeLogo.startsWith('data:') || safeLogo.startsWith('http') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
+                    return isImg ? (
+                      <img src={safeLogo} alt={activeRestaurant.name} className="w-12 h-12 rounded-xl object-cover border border-neutral-300" />
+                    ) : (
+                      <div className="text-3xl p-1 bg-white border border-neutral-200 rounded-xl">{safeLogo}</div>
+                    );
+                  })()}
                   <div className="flex-1 min-w-0">
                     <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors">
                       <Upload className="w-3.5 h-3.5" />
@@ -2716,11 +2725,15 @@ export const RestaurantDashboard: React.FC = () => {
               <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 rounded-xl bg-neutral-800 border border-neutral-700 overflow-hidden flex items-center justify-center shrink-0">
-                    {activeRestaurant.logo && (activeRestaurant.logo.startsWith('data:') || activeRestaurant.logo.startsWith('http') || activeRestaurant.logo.startsWith('/')) ? (
-                      <img src={activeRestaurant.logo} alt={activeRestaurant.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-lg">{activeRestaurant.logo || '🍽️'}</span>
-                    )}
+                    {(() => {
+                      const safeLogo = sanitizeRestaurantLogo(activeRestaurant.logo, '🍽️');
+                      const isImg = safeLogo.startsWith('data:') || safeLogo.startsWith('http') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
+                      return isImg ? (
+                        <img src={safeLogo} alt={activeRestaurant.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg">{safeLogo}</span>
+                      );
+                    })()}
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-extrabold text-sm text-white truncate">{activeRestaurant.name}</h3>

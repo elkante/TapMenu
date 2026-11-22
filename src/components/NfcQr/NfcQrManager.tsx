@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TableNfcTag, NfcStatus } from '../../types';
+import { sanitizeRestaurantLogo } from '../../utils/logoSanitizer';
 import { 
   checkWebNfcSupport, 
   writeNfcUrlPayload, 
@@ -175,7 +176,15 @@ export const NfcQrManager: React.FC = () => {
                 className="bg-white border-2 border-neutral-800 rounded-2xl p-5 text-center flex flex-col items-center justify-between min-h-[320px] break-inside-avoid"
               >
                 <div>
-                  <div className="text-2xl mb-1">{activeRestaurant.logo}</div>
+                  {(() => {
+                    const safeLogo = sanitizeRestaurantLogo(activeRestaurant.logo, '🍽️');
+                    const isImg = safeLogo.startsWith('data:') || safeLogo.startsWith('http') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
+                    return isImg ? (
+                      <img src={safeLogo} alt={activeRestaurant.name} className="w-8 h-8 mx-auto mb-1 rounded-lg object-cover" />
+                    ) : (
+                      <div className="text-2xl mb-1">{safeLogo}</div>
+                    );
+                  })()}
                   <h3 className="font-extrabold text-sm text-neutral-900">{activeRestaurant.name}</h3>
                 </div>
 

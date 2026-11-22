@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { sanitizeRestaurantLogo } from '../utils/logoSanitizer';
 import { 
   ShoppingBag, 
   PhoneCall,
@@ -66,13 +67,17 @@ export const TopNav: React.FC<{
             className="flex items-center gap-2 group text-left focus:outline-none min-w-0 active:scale-95 transition-transform"
             title="TapMenu - Tap 6 times for Super Admin"
           >
-            {activeRestaurant.logo && (activeRestaurant.logo.startsWith('data:') || activeRestaurant.logo.startsWith('http') || activeRestaurant.logo.startsWith('/')) ? (
-              <img src={activeRestaurant.logo} alt={activeRestaurant.name} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shrink-0 border border-neutral-200" />
-            ) : (
-              <span className="text-xl sm:text-2xl shrink-0 p-1 bg-neutral-100 rounded-lg">
-                {activeRestaurant.logo || '🍽️'}
-              </span>
-            )}
+            {(() => {
+              const safeLogo = sanitizeRestaurantLogo(activeRestaurant.logo, '🍽️');
+              const isImg = safeLogo.startsWith('data:') || safeLogo.startsWith('http') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
+              return isImg ? (
+                <img src={safeLogo} alt={activeRestaurant.name} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shrink-0 border border-neutral-200" />
+              ) : (
+                <span className="text-xl sm:text-2xl shrink-0 p-1 bg-neutral-100 rounded-lg">
+                  {safeLogo}
+                </span>
+              );
+            })()}
             <div className="min-w-0">
               <span className="font-extrabold text-sm sm:text-base tracking-tight text-neutral-900 block truncate group-hover:text-amber-800 transition-colors">
                 {activeRestaurant.name}

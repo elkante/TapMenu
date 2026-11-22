@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { RestaurantTenant, FoodItem, Order, WaiterCall, MenuBookPage } from '../types';
+import { sanitizeRestaurantLogo } from './logoSanitizer';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kxszokrflzknhtsicbzm.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_uHLP5_-WK_mZH-fHd_e3AQ_6XhkviZJ';
@@ -91,7 +92,15 @@ export const compressImageToDataUrl = fileToDataUrl;
 export function getStoredRestaurants(): RestaurantTenant[] {
   try {
     const raw = localStorage.getItem(KEY_RESTAURANTS);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map(r => ({
+          ...r,
+          logo: sanitizeRestaurantLogo(r.logo, '🍽️')
+        }));
+      }
+    }
   } catch (e) {
     console.warn('Failed to parse local restaurants', e);
   }
@@ -100,7 +109,11 @@ export function getStoredRestaurants(): RestaurantTenant[] {
 
 export function saveStoredRestaurants(restaurants: RestaurantTenant[]) {
   try {
-    localStorage.setItem(KEY_RESTAURANTS, JSON.stringify(restaurants));
+    const sanitized = (restaurants || []).map(r => ({
+      ...r,
+      logo: sanitizeRestaurantLogo(r.logo, '🍽️')
+    }));
+    localStorage.setItem(KEY_RESTAURANTS, JSON.stringify(sanitized));
   } catch (e) {
     console.warn('Failed to save local restaurants', e);
   }
@@ -282,12 +295,22 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
   const coverTextColor = rRow.cover_text_color || designObj.coverTextColor || localMatch?.design?.coverTextColor || '#D4AF37';
   const accentColor = rRow.accent_color || designObj.accentColor || localMatch?.design?.accentColor || '#d4af37';
 
+  const rawLogo = rRow.logo || localMatch?.logo || '';
+  const cleanLogo = sanitizeRestaurantLogo(rawLogo, '🍽️');
+
+  // Auto-heal corrupt logo in Supabase database in background
+  if (typeof window !== 'undefined' && supabase && rRow.id && rawLogo && rawLogo !== cleanLogo) {
+    try {
+      supabase.from('restaurants').update({ logo: cleanLogo }).eq('id', rRow.id).then();
+    } catch {}
+  }
+
   return {
     id: rRow.id,
     slug: rRow.slug,
     name: rRow.name,
     tagline: rRow.tagline || 'Kitchen & Bar',
-    logo: rRow.logo || localMatch?.logo || '🍽️',
+    logo: cleanLogo,
     coverImage: rRow.cover_image || localMatch?.coverImage || '',
     address: rRow.address || localMatch?.address || '',
     phone: rRow.phone || localMatch?.phone || '',

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Store, Lock, ArrowRight, Plus, CheckCircle2, Building, Sparkles, ExternalLink } from 'lucide-react';
 import { RestaurantTenant } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { sanitizeRestaurantLogo } from '../../utils/logoSanitizer';
 
 interface MultiStoreManagerModalProps {
   isOpen: boolean;
@@ -137,11 +138,15 @@ export const MultiStoreManagerModal: React.FC<MultiStoreManagerModalProps> = ({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-xl shrink-0">
-                        {rest.logo && (rest.logo.startsWith('http') || rest.logo.startsWith('data:')) ? (
-                          <img src={rest.logo} alt={rest.name} className="w-full h-full object-cover rounded-xl" />
-                        ) : (
-                          rest.logo || '🍽️'
-                        )}
+                        {(() => {
+                          const safeLogo = sanitizeRestaurantLogo(rest.logo, '🍽️');
+                          const isImg = safeLogo.startsWith('http') || safeLogo.startsWith('data:') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
+                          return isImg ? (
+                            <img src={safeLogo} alt={rest.name} className="w-full h-full object-cover rounded-xl" />
+                          ) : (
+                            safeLogo
+                          );
+                        })()}
                       </div>
 
                       <div className="min-w-0">

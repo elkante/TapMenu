@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp, AppViewMode } from '../context/AppContext';
+import { sanitizeRestaurantLogo } from '../utils/logoSanitizer';
 import { 
   Palette, 
   Nfc, 
@@ -75,7 +76,15 @@ export const OwnerHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <span className="text-xl">{r.logo}</span>
+                    {(() => {
+                      const safeLogo = sanitizeRestaurantLogo(r.logo, '🍽️');
+                      const isImg = safeLogo.startsWith('http') || safeLogo.startsWith('data:') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
+                      return isImg ? (
+                        <img src={safeLogo} alt={r.name} className="w-6 h-6 rounded-md object-cover" />
+                      ) : (
+                        <span className="text-xl">{safeLogo}</span>
+                      );
+                    })()}
                     <div className="truncate">
                       <div className="truncate">{r.name}</div>
                       <div className={`text-[10px] font-normal truncate ${r.id === activeRestaurantId ? 'text-neutral-300' : 'text-neutral-500'}`}>

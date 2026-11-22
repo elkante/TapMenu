@@ -321,7 +321,7 @@ export function createDefaultRestaurantTenant(
     slug,
     name,
     tagline: options?.tagline || 'Kitchen & Bar',
-    logo: options?.logo || '🛡️',
+    logo: options?.logo || '🍽️',
     coverImage: '',
     address: '',
     phone: '',
