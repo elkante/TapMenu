@@ -19,6 +19,8 @@ import {
 import { 
   getStoredPlans, 
   saveStoredPlans, 
+  getStoredVendorPlans,
+  saveStoredVendorPlans,
   resetPlansToDefault, 
   syncRemotePlans,
   PlanTier 
@@ -56,7 +58,8 @@ import {
   RotateCcw,
   AlertCircle,
   QrCode,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 
 // Cryptographic Salt & Precomputed SHA-256 Hashes
@@ -98,10 +101,12 @@ export const SuperAdminView: React.FC = () => {
   const [tenants, setTenants] = useState<RestaurantTenant[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'restaurant' | 'vendor'>('all');
   const [activeTab, setActiveTab] = useState<'restaurants' | 'plans' | 'settings' | 'hardware'>('restaurants');
 
   // Live Subscription Plans
   const [plans, setPlans] = useState<PlanTier[]>(() => getStoredPlans());
+  const [vendorPlans, setVendorPlans] = useState<PlanTier[]>(() => getStoredVendorPlans());
   const [hasPlanChanges, setHasPlanChanges] = useState(false);
 
   // Card hardware orders
@@ -116,13 +121,14 @@ export const SuperAdminView: React.FC = () => {
   const [contactConfig, setContactConfig] = useState<PlatformContactConfig>(DEFAULT_PLATFORM_CONTACT);
   const [isSavingContact, setIsSavingContact] = useState(false);
 
-  // Modal: Onboard new restaurant
+  // Modal: Onboard new restaurant or vendor
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
+  const [onboardBusinessType, setOnboardBusinessType] = useState<'restaurant' | 'vendor'>('restaurant');
   const [newName, setNewName] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newPlan, setNewPlan] = useState<'Basic' | 'Standard' | 'Premium' | 'Enterprise'>('Standard');
+  const [newPlan, setNewPlan] = useState<'Basic' | 'Standard' | 'Premium' | 'Enterprise' | 'Vendor'>('Standard');
   const [qrModalTenant, setQrModalTenant] = useState<RestaurantTenant | null>(null);
 
   // Load all restaurants from Supabase (merging local cache)
@@ -307,20 +313,27 @@ export const SuperAdminView: React.FC = () => {
     e.preventDefault();
     if (!newName.trim() || !newSlug.trim()) return;
 
+    const isVendor = onboardBusinessType === 'vendor';
+    const effectivePlan = isVendor ? 'vendor' : newPlan.toLowerCase();
+    const effectiveServiceMode = isVendor ? 'counter_only' : 'table_service';
+
     const res = await registerRestaurant({
       name: newName.trim(),
       slug: newSlug.trim(),
       email: newEmail.trim() || `admin@${newSlug}.com`,
       password: newPassword,
-      plan: newPlan.toLowerCase(),
+      plan: effectivePlan,
+      serviceMode: effectiveServiceMode,
+      tableLimit: isVendor ? null : undefined,
     });
 
     if (res.success && res.restaurant) {
-      showNotification(`🎉 Provisioned restaurant "${res.restaurant.name}"!`);
+      showNotification(`🎉 Provisioned ${isVendor ? 'Street Vendor' : 'Restaurant'} "${res.restaurant.name}"!`);
       setIsOnboardModalOpen(false);
       setNewName('');
       setNewSlug('');
       setNewEmail('');
+      setOnboardBusinessType('restaurant');
       loadAllTenants();
     } else {
       showNotification(res.error || 'Failed to provision restaurant');
@@ -330,9 +343,19 @@ export const SuperAdminView: React.FC = () => {
   const handleUpdateTenantPlan = async (restaurantId: string, planId: string) => {
     const t = tenants.find(item => item.id === restaurantId);
     if (!t) return;
-    await updateRestaurantPlanInSupabase(restaurantId, planId, t.tableLimit ?? null);
-    setTenants(prev => prev.map(item => item.id === restaurantId ? { ...item, plan: planId } : item));
-    showNotification(`Updated plan to ${planId.toUpperCase()} for ${t.name}`);
+    const isVendor = planId === 'vendor' || planId === 'vendor-pro' || planId === 'vendor-monthly';
+    const newServiceMode = isVendor ? 'counter_only' : 'table_service';
+    const newTableLimit = isVendor ? null : (t.tableLimit ?? null);
+
+    await updateRestaurantPlanInSupabase(restaurantId, planId, newTableLimit);
+    await syncRestaurantMetaToSupabase(restaurantId, { serviceMode: newServiceMode, plan: planId });
+    setTenants(prev => prev.map(item => item.id === restaurantId ? { 
+      ...item, 
+      plan: planId, 
+      serviceMode: newServiceMode,
+      tableLimit: newTableLimit
+    } : item));
+    showNotification(`Updated plan to ${planId.toUpperCase()} (${isVendor ? '⚡ Street Vendor' : '🍽️ Restaurant'}) for ${t.name}`);
   };
 
   const handleUpdateTenantCustomTableLimit = async (restaurantId: string, limitVal: number | null) => {
@@ -406,14 +429,31 @@ export const SuperAdminView: React.FC = () => {
     window.location.href = '/';
   };
 
-  // Filtered tenants
-  const filteredTenants = tenants.filter(t => 
-    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.slug.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const isVendorTenant = (t: RestaurantTenant) => 
+    t.plan === 'vendor' || 
+    t.plan === 'vendor-monthly' || 
+    t.plan === 'vendor-pro' || 
+    t.serviceMode === 'counter_only';
+
+  const vendorCount = tenants.filter(isVendorTenant).length;
+  const restaurantCount = tenants.filter(t => !isVendorTenant(t)).length;
+
+  // Filtered tenants by search query & category filter (All, Restaurants, Vendors)
+  const filteredTenants = tenants.filter(t => {
+    const query = searchQuery.toLowerCase().trim();
+    const matchesSearch = !query || 
+      t.name.toLowerCase().includes(query) ||
+      t.slug.toLowerCase().includes(query) ||
+      (t.ownerEmail || '').toLowerCase().includes(query);
+    if (!matchesSearch) return false;
+    if (categoryFilter === 'vendor') return isVendorTenant(t);
+    if (categoryFilter === 'restaurant') return !isVendorTenant(t);
+    return true;
+  });
 
   // Platform Metrics
   const totalRestaurants = tenants.length;
+  const totalTenants = tenants.length;
   const totalTables = tenants.reduce((acc, t) => acc + (t.tables?.length || 0), 0);
   const totalDishes = tenants.reduce((acc, t) => 
     acc + t.pages.reduce((pAcc, p) => pAcc + p.items.length, 0), 0
@@ -427,6 +467,8 @@ export const SuperAdminView: React.FC = () => {
   // Estimated MRR based on dynamically configured plans
   const estimatedMrr = tenants.reduce((acc, t) => {
     const pl = (t.plan || '').toLowerCase();
+    if (pl === 'vendor-pro') return acc + 7500;
+    if (pl === 'vendor' || pl === 'vendor-monthly' || t.serviceMode === 'counter_only') return acc + 4000;
     if (pl.includes('enterprise')) return acc + enterprisePrice;
     if (pl.includes('premium')) return acc + premiumPrice;
     if (pl.includes('standard') || pl.includes('growth')) return acc + standardPrice;
@@ -436,8 +478,16 @@ export const SuperAdminView: React.FC = () => {
   const handleUpdatePlan = (planId: string, updates: Partial<PlanTier>) => {
     setPlans(prev => {
       const updated = prev.map(p => p.id === planId ? { ...p, ...updates } : p);
-      // Immediately persist to storage and dispatch event so updates reflect across the entire site
       saveStoredPlans(updated);
+      return updated;
+    });
+    setHasPlanChanges(true);
+  };
+
+  const handleUpdateVendorPlan = (planId: string, updates: Partial<PlanTier>) => {
+    setVendorPlans(prev => {
+      const updated = prev.map(p => p.id === planId ? { ...p, ...updates } : p);
+      saveStoredVendorPlans(updated);
       return updated;
     });
     setHasPlanChanges(true);
@@ -445,6 +495,7 @@ export const SuperAdminView: React.FC = () => {
 
   const handleSavePlans = () => {
     saveStoredPlans(plans);
+    saveStoredVendorPlans(vendorPlans);
     setHasPlanChanges(false);
     showNotification('🎉 Pricing plans saved! Live across all pages.');
   };
@@ -452,6 +503,7 @@ export const SuperAdminView: React.FC = () => {
   const handleResetPlans = () => {
     const defaults = resetPlansToDefault();
     setPlans(defaults);
+    setVendorPlans(getStoredVendorPlans());
     setHasPlanChanges(false);
     showNotification('Reset pricing plans to platform defaults.');
   };
@@ -634,7 +686,7 @@ export const SuperAdminView: React.FC = () => {
               className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl transition-all shadow-md active:scale-95 text-xs"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Onboard Restaurant</span>
+              <span>Onboard Restaurant / Vendor</span>
             </button>
           </div>
         </div>
@@ -644,16 +696,28 @@ export const SuperAdminView: React.FC = () => {
       <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-5 sm:space-y-8 pb-28 md:pb-8">
         
         {/* KPI Metrics Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4">
           <div className="bg-neutral-900 border border-neutral-800 p-3.5 sm:p-5 rounded-2xl">
             <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
-              Total Restaurants
+              Dine-In Restaurants
             </span>
             <span className="text-2xl sm:text-3xl font-extrabold font-mono text-white mt-1 block">
-              {totalRestaurants}
+              {restaurantCount}
             </span>
             <span className="text-[10px] sm:text-[11px] text-emerald-400 mt-1 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 shrink-0" /> Live Supabase
+              <CheckCircle2 className="w-3 h-3 shrink-0" /> Tables & KDS
+            </span>
+          </div>
+
+          <div className="bg-neutral-900 border border-neutral-800 p-3.5 sm:p-5 rounded-2xl">
+            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block flex items-center gap-1">
+              <Zap className="w-3 h-3 text-amber-400" /> Street Vendors
+            </span>
+            <span className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-300 mt-1 block">
+              {vendorCount}
+            </span>
+            <span className="text-[10px] sm:text-[11px] text-neutral-400 mt-1 block truncate">
+              Counter & Pickup
             </span>
           </div>
 
@@ -681,7 +745,7 @@ export const SuperAdminView: React.FC = () => {
             </span>
           </div>
 
-          <div className="bg-neutral-900 border border-neutral-800 p-3.5 sm:p-5 rounded-2xl">
+          <div className="col-span-2 lg:col-span-1 bg-neutral-900 border border-neutral-800 p-3.5 sm:p-5 rounded-2xl">
             <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
               Estimated Monthly MRR
             </span>
@@ -704,7 +768,7 @@ export const SuperAdminView: React.FC = () => {
                 : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
             }`}
           >
-            All Registered Restaurants ({totalRestaurants})
+            All Accounts ({totalTenants})
           </button>
           <button
             onClick={() => setActiveTab('plans')}
@@ -743,51 +807,95 @@ export const SuperAdminView: React.FC = () => {
           </button>
         </div>
 
-        {/* TAB 1: ALL RESTAURANTS */}
+        {/* TAB 1: ALL ACCOUNTS (RESTAURANTS & STREET VENDORS) */}
         {activeTab === 'restaurants' && (
           <div className="space-y-4">
-            {/* Search and Refresh Bar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="relative flex-1 max-w-md">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by restaurant name or slug..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
-                />
+            {/* Category Filter Pills & Search Bar */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1.5 p-1 bg-neutral-900 border border-neutral-800 rounded-xl shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    categoryFilter === 'all'
+                      ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+                  }`}
+                >
+                  All ({totalTenants})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('restaurant')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    categoryFilter === 'restaurant'
+                      ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+                  }`}
+                >
+                  <Utensils className="w-3 h-3" />
+                  <span>Restaurants ({restaurantCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('vendor')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    categoryFilter === 'vendor'
+                      ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+                  }`}
+                >
+                  <Zap className="w-3 h-3" />
+                  <span>Street Vendors ({vendorCount})</span>
+                </button>
               </div>
 
-              <button
-                onClick={loadAllTenants}
-                disabled={loading}
-                className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-xl text-xs text-neutral-300 font-semibold transition-colors shrink-0"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-400' : ''}`} />
-                <span>Sync with Supabase</span>
-              </button>
+              {/* Search & Sync Bar */}
+              <div className="flex items-center gap-2 flex-1 max-w-md">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by venue name, slug or email..."
+                    className="w-full pl-10 pr-4 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <button
+                  onClick={loadAllTenants}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-xl text-xs text-neutral-300 font-semibold transition-colors shrink-0"
+                  title="Sync with Supabase"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-400' : ''}`} />
+                  <span className="hidden sm:inline">Sync</span>
+                </button>
+              </div>
             </div>
 
-            {/* Desktop Restaurants Table */}
+            {/* Desktop Restaurants & Vendors Table */}
             <div className="hidden md:block bg-neutral-900 rounded-2xl border border-neutral-800 overflow-hidden shadow-lg">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-neutral-950/60 border-b border-neutral-800 text-neutral-400 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
-                      <th className="py-3.5 px-4">Restaurant</th>
+                      <th className="py-3.5 px-4">Venue / Brand</th>
                       <th className="py-3.5 px-4">Owner Email</th>
                       <th className="py-3.5 px-4">Slug & Live URL</th>
                       <th className="py-3.5 px-4">Plan</th>
-                      <th className="py-3.5 px-4">Tables / Dishes</th>
+                      <th className="py-3.5 px-4">Mode / Tables</th>
                       <th className="py-3.5 px-4">Status</th>
                       <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-800/60">
                     {filteredTenants.map((t) => {
+                      const isVendor = isVendorTenant(t);
                       const dishCount = t.pages.reduce((sum, p) => sum + p.items.length, 0);
-                      const customerUrl = `/?r=${t.slug}&table=Table+1`;
+                      const customerUrl = `/?r=${t.slug}${isVendor ? '' : '&table=Table+1'}`;
 
                       return (
                         <tr key={t.id} className="hover:bg-neutral-800/40 transition-colors">
@@ -795,7 +903,7 @@ export const SuperAdminView: React.FC = () => {
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-lg bg-neutral-800 border border-neutral-700 overflow-hidden flex items-center justify-center shrink-0">
                                 {(() => {
-                                  const safeLogo = sanitizeRestaurantLogo(t.logo, '🍽️');
+                                  const safeLogo = sanitizeRestaurantLogo(t.logo, isVendor ? '⚡' : '🍽️');
                                   const isImg = safeLogo.startsWith('data:') || safeLogo.startsWith('http') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
                                   return isImg ? (
                                     <img src={safeLogo} alt={t.name} className="w-full h-full object-cover" />
@@ -805,8 +913,20 @@ export const SuperAdminView: React.FC = () => {
                                 })()}
                               </div>
                               <div>
-                                <div className="font-bold text-white text-sm">{t.name}</div>
-                                <div className="text-[11px] text-neutral-400">{t.tagline || 'Kitchen & Bar'}</div>
+                                <div className="font-bold text-white text-sm flex items-center gap-2">
+                                  <span>{t.name}</span>
+                                  {isVendor ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                      <Zap className="w-2.5 h-2.5" />
+                                      Street Vendor
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-neutral-800 text-neutral-400 border border-neutral-700">
+                                      Dine-In
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-neutral-400">{t.tagline || (isVendor ? 'Street Vendor / Stall' : 'Kitchen & Bar')}</div>
                               </div>
                             </div>
                           </td>
@@ -839,62 +959,88 @@ export const SuperAdminView: React.FC = () => {
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <div className="flex flex-col gap-1.5 min-w-[155px]">
+                            <div className="flex flex-col gap-1.5 min-w-[170px]">
                               {/* Plan Selector */}
                               <select
-                                value={(t.plan || 'basic').toLowerCase()}
+                                value={(t.plan || (isVendor ? 'vendor' : 'basic')).toLowerCase()}
                                 onChange={(e) => handleUpdateTenantPlan(t.id, e.target.value)}
                                 className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded-lg text-amber-300 font-bold text-[11px] focus:outline-none focus:border-amber-400 cursor-pointer"
                               >
-                                <option value="basic">Basic (10 tables)</option>
-                                <option value="standard">Standard (20 tables)</option>
-                                <option value="premium">Premium (60 tables)</option>
-                                <option value="enterprise">Enterprise (Unlimited)</option>
+                                <optgroup label="🍽️ Dine-In Plans">
+                                  <option value="basic">Basic (10 tables - ₦8k/mo)</option>
+                                  <option value="standard">Standard (20 tables - ₦19k/mo)</option>
+                                  <option value="premium">Premium (60 tables - ₦30k/mo)</option>
+                                  <option value="enterprise">Enterprise (Unlimited - ₦70k/mo)</option>
+                                </optgroup>
+                                <optgroup label="⚡ Street Vendor Plans">
+                                  <option value="vendor">Vendor (Single Counter · ₦4,000/mo)</option>
+                                  <option value="vendor-monthly">Vendor Monthly (₦4,000/mo)</option>
+                                  <option value="vendor-pro">Vendor Pro (₦7,500/mo)</option>
+                                </optgroup>
                               </select>
 
-                              {/* Manual Custom Limit Override */}
-                              <div className="flex items-center gap-1.5 text-[10px] text-neutral-400">
-                                <span className="shrink-0">Limit override:</span>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  placeholder="Auto"
-                                  value={t.tableLimit ?? ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value === '' ? null : Math.max(1, parseInt(e.target.value, 10));
-                                    handleUpdateTenantCustomTableLimit(t.id, val);
-                                  }}
-                                  className="w-14 px-1.5 py-0.5 bg-neutral-950 border border-neutral-700 rounded text-center text-white text-[10px] focus:outline-none focus:border-amber-400"
-                                  title="Leave empty to use plan default, or enter specific max tables"
-                                />
-                                {t.tableLimit !== undefined && t.tableLimit !== null && (
-                                  <span className="text-amber-400 font-bold text-[9px]">(custom)</span>
-                                )}
-                              </div>
+                              {/* Manual Custom Limit Override (Only for Dine-In) */}
+                              {isVendor ? (
+                                <span className="text-[10px] text-amber-400/80 font-medium flex items-center gap-1">
+                                  <Zap className="w-2.5 h-2.5 text-amber-400" />
+                                  Single Counter Walk-up
+                                </span>
+                              ) : (
+                                <div className="flex items-center gap-1.5 text-[10px] text-neutral-400">
+                                  <span className="shrink-0">Limit override:</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    placeholder="Auto"
+                                    value={t.tableLimit ?? ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value === '' ? null : Math.max(1, parseInt(e.target.value, 10));
+                                      handleUpdateTenantCustomTableLimit(t.id, val);
+                                    }}
+                                    className="w-14 px-1.5 py-0.5 bg-neutral-950 border border-neutral-700 rounded text-center text-white text-[10px] focus:outline-none focus:border-amber-400"
+                                    title="Leave empty to use plan default, or enter specific max tables"
+                                  />
+                                  {t.tableLimit !== undefined && t.tableLimit !== null && (
+                                    <span className="text-amber-400 font-bold text-[9px]">(custom)</span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </td>
 
                           <td className="py-3.5 px-4 font-mono text-neutral-300 text-[11px]">
-                            <div>
-                              <span className="font-bold text-white">{t.tables?.length || 0}</span>
-                              <span className="text-neutral-500"> / </span>
-                              <span className="text-amber-300 font-semibold">
-                                {t.tableLimit !== undefined && t.tableLimit !== null
-                                  ? `${t.tableLimit} max`
-                                  : (() => {
-                                      const pl = (t.plan || 'basic').toLowerCase();
-                                      if (pl.includes('enterprise')) return '∞';
-                                      if (pl.includes('premium')) return '60 max';
-                                      if (pl.includes('standard') || pl.includes('growth')) return '20 max';
-                                      return '10 max';
-                                    })()
-                                }
-                              </span>
-                              <span className="text-neutral-400 ml-1">tables</span>
-                            </div>
-                            <div className="text-[10px] text-neutral-400 mt-0.5">
-                              {dishCount} dishes
-                            </div>
+                            {isVendor ? (
+                              <div>
+                                <div className="font-bold text-amber-300 flex items-center gap-1">
+                                  <Zap className="w-3 h-3 text-amber-400" />
+                                  <span>Walk-up Counter</span>
+                                </div>
+                                <div className="text-[10px] text-neutral-400 mt-0.5">
+                                  {dishCount} menu items &middot; No tables
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="font-bold text-white">{t.tables?.length || 0}</span>
+                                <span className="text-neutral-500"> / </span>
+                                <span className="text-amber-300 font-semibold">
+                                  {t.tableLimit !== undefined && t.tableLimit !== null
+                                    ? `${t.tableLimit} max`
+                                    : (() => {
+                                        const pl = (t.plan || 'basic').toLowerCase();
+                                        if (pl.includes('enterprise')) return '∞';
+                                        if (pl.includes('premium')) return '60 max';
+                                        if (pl.includes('standard') || pl.includes('growth')) return '20 max';
+                                        return '10 max';
+                                      })()
+                                  }
+                                </span>
+                                <span className="text-neutral-400 ml-1">tables</span>
+                                <div className="text-[10px] text-neutral-400 mt-0.5">
+                                  {dishCount} dishes
+                                </div>
+                              </div>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -924,7 +1070,7 @@ export const SuperAdminView: React.FC = () => {
                               <button
                                 onClick={() => handleLoginAs(t)}
                                 className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg font-bold text-[11px] transition-colors"
-                                title="Login and manage this restaurant's menu"
+                                title="Login and manage this venue's menu"
                               >
                                 Manage
                               </button>
@@ -932,7 +1078,7 @@ export const SuperAdminView: React.FC = () => {
                               <button
                                 onClick={() => handleInitiatePurge(t)}
                                 className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                                title="Purge restaurant and credentials"
+                                title="Purge venue and credentials"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -945,7 +1091,7 @@ export const SuperAdminView: React.FC = () => {
                     {filteredTenants.length === 0 && (
                       <tr>
                         <td colSpan={7} className="py-8 text-center text-neutral-500">
-                          No matching restaurants found in Supabase database.
+                          No matching venues found in Supabase database.
                         </td>
                       </tr>
                     )}
@@ -954,11 +1100,12 @@ export const SuperAdminView: React.FC = () => {
               </div>
             </div>
 
-            {/* Mobile Restaurant Cards List */}
+            {/* Mobile Restaurant & Vendor Cards List */}
             <div className="space-y-3.5 md:hidden">
               {filteredTenants.map((t) => {
+                const isVendor = isVendorTenant(t);
                 const dishCount = t.pages.reduce((sum, p) => sum + p.items.length, 0);
-                const customerUrl = `/?r=${t.slug}&table=Table+1`;
+                const customerUrl = `/?r=${t.slug}${isVendor ? '' : '&table=Table+1'}`;
 
                 return (
                   <div key={t.id} className="bg-neutral-900 rounded-2xl border border-neutral-800 p-4 shadow-md space-y-3">
@@ -967,7 +1114,7 @@ export const SuperAdminView: React.FC = () => {
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 overflow-hidden flex items-center justify-center shrink-0">
                           {(() => {
-                            const safeLogo = sanitizeRestaurantLogo(t.logo, '🍽️');
+                            const safeLogo = sanitizeRestaurantLogo(t.logo, isVendor ? '⚡' : '🍽️');
                             const isImg = safeLogo.startsWith('data:') || safeLogo.startsWith('http') || safeLogo.startsWith('/') || safeLogo.startsWith('blob:');
                             return isImg ? (
                               <img src={safeLogo} alt={t.name} className="w-full h-full object-cover" />
@@ -977,8 +1124,20 @@ export const SuperAdminView: React.FC = () => {
                           })()}
                         </div>
                         <div className="min-w-0">
-                          <h4 className="font-bold text-white text-sm truncate">{t.name}</h4>
-                          <p className="text-[11px] text-neutral-400 truncate">{t.tagline || 'Kitchen & Bar'}</p>
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-bold text-white text-sm truncate">{t.name}</h4>
+                            {isVendor ? (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                                <Zap className="w-2.5 h-2.5" />
+                                Vendor
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-neutral-800 text-neutral-400 border border-neutral-700 shrink-0">
+                                Dine-In
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-neutral-400 truncate">{t.tagline || (isVendor ? 'Street Vendor / Stall' : 'Kitchen & Bar')}</p>
                           {t.ownerEmail && (
                             <p className="text-[10px] text-amber-400/80 font-mono truncate mt-0.5">{t.ownerEmail}</p>
                           )}
@@ -1009,25 +1168,33 @@ export const SuperAdminView: React.FC = () => {
                         <span className="truncate">/?r={t.slug}</span>
                         <ExternalLink className="w-3 h-3 shrink-0" />
                       </a>
-                      <div className="font-mono text-[11px] text-neutral-300 shrink-0">
-                        <span className="font-bold text-white">{t.tables?.length || 0}</span>
-                        <span className="text-neutral-500">/</span>
-                        <span className="text-amber-300 font-semibold">
-                          {t.tableLimit !== undefined && t.tableLimit !== null
-                            ? `${t.tableLimit}`
-                            : (() => {
-                                const pl = (t.plan || 'basic').toLowerCase();
-                                if (pl.includes('enterprise')) return '∞';
-                                if (pl.includes('premium')) return '60';
-                                if (pl.includes('standard') || pl.includes('growth')) return '20';
-                                return '10';
-                              })()
-                          }
-                        </span>
-                        <span className="text-neutral-400 ml-1">tbls</span>
-                        <span className="text-neutral-500 mx-1">·</span>
-                        <span className="text-neutral-400">{dishCount} dishes</span>
-                      </div>
+
+                      {isVendor ? (
+                        <div className="font-mono text-[11px] text-amber-300 font-semibold shrink-0 flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-amber-400" />
+                          <span>Walk-up Counter &middot; {dishCount} dishes</span>
+                        </div>
+                      ) : (
+                        <div className="font-mono text-[11px] text-neutral-300 shrink-0">
+                          <span className="font-bold text-white">{t.tables?.length || 0}</span>
+                          <span className="text-neutral-500">/</span>
+                          <span className="text-amber-300 font-semibold">
+                            {t.tableLimit !== undefined && t.tableLimit !== null
+                              ? `${t.tableLimit}`
+                              : (() => {
+                                  const pl = (t.plan || 'basic').toLowerCase();
+                                  if (pl.includes('enterprise')) return '∞';
+                                  if (pl.includes('premium')) return '60';
+                                  if (pl.includes('standard') || pl.includes('growth')) return '20';
+                                  return '10';
+                                })()
+                            }
+                          </span>
+                          <span className="text-neutral-400 ml-1">tbls</span>
+                          <span className="text-neutral-500 mx-1">·</span>
+                          <span className="text-neutral-400">{dishCount} dishes</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Plan & Limit Overrides */}
@@ -1035,36 +1202,50 @@ export const SuperAdminView: React.FC = () => {
                       <div className="flex items-center justify-between gap-2">
                         <label className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">Plan</label>
                         <select
-                          value={(t.plan || 'basic').toLowerCase()}
+                          value={(t.plan || (isVendor ? 'vendor' : 'basic')).toLowerCase()}
                           onChange={(e) => handleUpdateTenantPlan(t.id, e.target.value)}
                           className="px-2.5 py-1 bg-neutral-900 border border-neutral-700 rounded-lg text-amber-300 font-bold text-xs focus:outline-none focus:border-amber-400 cursor-pointer"
                         >
-                          <option value="basic">Basic (10 tables)</option>
-                          <option value="standard">Standard (20 tables)</option>
-                          <option value="premium">Premium (60 tables)</option>
-                          <option value="enterprise">Enterprise (Unlimited)</option>
+                          <optgroup label="🍽️ Dine-In Plans">
+                            <option value="basic">Basic (10 tables)</option>
+                            <option value="standard">Standard (20 tables)</option>
+                            <option value="premium">Premium (60 tables)</option>
+                            <option value="enterprise">Enterprise (Unlimited)</option>
+                          </optgroup>
+                          <optgroup label="⚡ Street Vendor Plans">
+                            <option value="vendor">Vendor (Single Counter · ₦4,000)</option>
+                            <option value="vendor-monthly">Vendor Monthly (₦4,000)</option>
+                            <option value="vendor-pro">Vendor Pro (₦7,500)</option>
+                          </optgroup>
                         </select>
                       </div>
 
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">Table Limit Override</label>
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="number"
-                            min={1}
-                            placeholder="Auto"
-                            value={t.tableLimit ?? ''}
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? null : Math.max(1, parseInt(e.target.value, 10));
-                              handleUpdateTenantCustomTableLimit(t.id, val);
-                            }}
-                            className="w-16 px-2 py-1 bg-neutral-900 border border-neutral-700 rounded-lg text-center text-white text-xs focus:outline-none focus:border-amber-400"
-                          />
-                          {t.tableLimit !== undefined && t.tableLimit !== null && (
-                            <span className="text-amber-400 font-bold text-[9px]">(custom)</span>
-                          )}
+                      {!isVendor ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">Table Limit Override</label>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min={1}
+                              placeholder="Auto"
+                              value={t.tableLimit ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? null : Math.max(1, parseInt(e.target.value, 10));
+                                handleUpdateTenantCustomTableLimit(t.id, val);
+                              }}
+                              className="w-16 px-2 py-1 bg-neutral-900 border border-neutral-700 rounded-lg text-center text-white text-xs focus:outline-none focus:border-amber-400"
+                            />
+                            {t.tableLimit !== undefined && t.tableLimit !== null && (
+                              <span className="text-amber-400 font-bold text-[10px]">(custom)</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="text-[10px] text-amber-400/80 font-medium flex items-center gap-1 pt-0.5">
+                          <Zap className="w-2.5 h-2.5 text-amber-400" />
+                          <span>Single Counter Mode &middot; Dine-in table limits disabled</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Card Actions */}
@@ -1423,6 +1604,103 @@ export const SuperAdminView: React.FC = () => {
                 ))}
               </div>
 
+              {/* Street Vendor Subscription Plans */}
+              <div className="mt-8 pt-6 border-t border-neutral-800">
+                <div className="mb-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span>Street Vendor Plans (Counter & Pop-Up Stalls)</span>
+                  </h4>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Pricing for single-counter, walk-up vendors (no dine-in table system).
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {vendorPlans.map((vp) => (
+                    <div
+                      key={vp.id}
+                      className="p-4 rounded-2xl border bg-neutral-950 border-neutral-800 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-serif font-bold text-sm text-white">{vp.name}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                            {vp.badge || 'Street Vendor'}
+                          </span>
+                        </div>
+
+                        {/* Monthly Rate Input */}
+                        <div className="mb-3">
+                          <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
+                            Monthly Price (₦)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-neutral-500 text-xs font-bold">₦</span>
+                            <input
+                              type="number"
+                              step={500}
+                              value={vp.monthlyPrice}
+                              onChange={(e) => handleUpdateVendorPlan(vp.id, { monthlyPrice: Number(e.target.value) })}
+                              className="w-full pl-7 pr-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Annual Rate Input */}
+                        <div className="mb-3">
+                          <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
+                            Annual Price (₦)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-neutral-500 text-xs font-bold">₦</span>
+                            <input
+                              type="number"
+                              step={5000}
+                              value={vp.annualPrice}
+                              onChange={(e) => handleUpdateVendorPlan(vp.id, { annualPrice: Number(e.target.value) })}
+                              className="w-full pl-7 pr-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Annual Incentive Perk */}
+                        <div className="mb-3">
+                          <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+                            🎁 Annual Incentive Perk
+                          </label>
+                          <input
+                            type="text"
+                            value={vp.annualIncentive || ''}
+                            placeholder="e.g. Save ₦8,000 (2 Mos Free) + 2 Free NFC Counter Stands"
+                            onChange={(e) => handleUpdateVendorPlan(vp.id, { annualIncentive: e.target.value })}
+                            className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+
+                        {/* Subtitle / Tagline */}
+                        <div className="mb-3">
+                          <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
+                            Target Audience Tagline
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={vp.tagline}
+                            onChange={(e) => handleUpdateVendorPlan(vp.id, { tagline: e.target.value })}
+                            className="w-full px-2.5 py-1.5 bg-neutral-900 border border-neutral-700 rounded-xl text-[11px] text-neutral-300 focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-neutral-800 text-[10px] text-amber-400 flex items-center gap-1">
+                        <Zap className="w-3 h-3" />
+                        <span>Single Counter Walk-up &middot; {vp.features.length} core features included</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {hasPlanChanges && (
                 <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-amber-300">
                   <span>You have unsaved pricing modifications!</span>
@@ -1670,24 +1948,69 @@ export const SuperAdminView: React.FC = () => {
         </button>
       </nav>
 
-      {/* MODAL: Onboard Restaurant */}
+      {/* MODAL: Onboard Venue or Street Vendor */}
       {isOnboardModalOpen && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-neutral-900 border border-neutral-700 rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-base font-bold text-white mb-1">Provision New Restaurant Tenant</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base font-bold text-white">Provision New Account</h3>
+              <button
+                type="button"
+                onClick={() => setIsOnboardModalOpen(false)}
+                className="text-neutral-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <p className="text-xs text-neutral-400 mb-4">
               Instantly provisions a cloud database row, private dashboard, and public flipbook URL.
             </p>
 
+            {/* Account Type Toggle: Restaurant vs Street Vendor */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-950 border border-neutral-800 rounded-2xl mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setOnboardBusinessType('restaurant');
+                  setNewPlan('Standard');
+                }}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  onboardBusinessType === 'restaurant'
+                    ? 'bg-amber-500 text-neutral-950 shadow-md'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                <Utensils className="w-3.5 h-3.5" />
+                <span>Restaurant</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOnboardBusinessType('vendor');
+                  setNewPlan('Vendor');
+                }}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  onboardBusinessType === 'vendor'
+                    ? 'bg-amber-500 text-neutral-950 shadow-md'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Street Vendor</span>
+              </button>
+            </div>
+
             <form onSubmit={handleCreateRestaurant} className="space-y-3.5 text-xs">
               <div>
-                <label className="block font-bold text-neutral-300 mb-1">Restaurant Name *</label>
+                <label className="block font-bold text-neutral-300 mb-1">
+                  {onboardBusinessType === 'vendor' ? 'Vendor / Brand Name *' : 'Restaurant Name *'}
+                </label>
                 <input
                   type="text"
                   required
                   value={newName}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g. Suya Kingdom, Lekki Bistro"
+                  placeholder={onboardBusinessType === 'vendor' ? 'e.g. Iya Basira Suya, Mama Put Kitchen' : 'e.g. Suya Kingdom, Lekki Bistro'}
                   className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
                 />
               </div>
@@ -1709,16 +2032,26 @@ export const SuperAdminView: React.FC = () => {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block font-bold text-neutral-300 mb-1">Subscription Plan</label>
-                  <select
-                    value={newPlan}
-                    onChange={(e) => setNewPlan(e.target.value as any)}
-                    className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none"
-                  >
-                    <option value="Basic">Basic (10 tables - ₦8k/mo)</option>
-                    <option value="Standard">Standard (20 tables - ₦19k/mo)</option>
-                    <option value="Premium">Premium (60 tables - ₦30k/mo)</option>
-                    <option value="Enterprise">Enterprise (Unlimited - ₦70k/mo)</option>
-                  </select>
+                  {onboardBusinessType === 'vendor' ? (
+                    <select
+                      value={newPlan}
+                      onChange={(e) => setNewPlan(e.target.value as any)}
+                      className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-xl text-amber-300 font-bold focus:outline-none"
+                    >
+                      <option value="Vendor">Vendor Monthly (Single Counter · ₦4,000/mo)</option>
+                    </select>
+                  ) : (
+                    <select
+                      value={newPlan}
+                      onChange={(e) => setNewPlan(e.target.value as any)}
+                      className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none"
+                    >
+                      <option value="Basic">Basic (10 tables - ₦8k/mo)</option>
+                      <option value="Standard">Standard (20 tables - ₦19k/mo)</option>
+                      <option value="Premium">Premium (60 tables - ₦30k/mo)</option>
+                      <option value="Enterprise">Enterprise (Unlimited - ₦70k/mo)</option>
+                    </select>
+                  )}
                 </div>
 
                 <div>
@@ -1727,7 +2060,7 @@ export const SuperAdminView: React.FC = () => {
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="manager@restaurant.com"
+                    placeholder={onboardBusinessType === 'vendor' ? 'vendor@gmail.com' : 'manager@restaurant.com'}
                     className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none"
                   />
                 </div>
@@ -1743,9 +2076,19 @@ export const SuperAdminView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl transition-colors shadow-md"
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl transition-colors shadow-md flex items-center gap-1.5"
                 >
-                  Provision Restaurant
+                  {onboardBusinessType === 'vendor' ? (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      <span>Provision Street Vendor</span>
+                    </>
+                  ) : (
+                    <>
+                      <Utensils className="w-4 h-4" />
+                      <span>Provision Restaurant</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

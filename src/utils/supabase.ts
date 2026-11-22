@@ -315,11 +315,11 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
     address: rRow.address || localMatch?.address || '',
     phone: rRow.phone || localMatch?.phone || '',
     openingHours: rRow.opening_hours || localMatch?.openingHours || '10:00 AM - 10:00 PM',
-    plan: rRow.plan || 'basic',
+    plan: rRow.plan || designObj.plan || localMatch?.plan || 'basic',
     tableLimit: (rRow.table_limit !== undefined && rRow.table_limit !== null) ? Number(rRow.table_limit) : undefined,
     status: (rRow.status as any) || 'active',
     ownerEmail: rRow.email || rRow.owner_email || localMatch?.ownerEmail || (rRow.owner_id ? undefined : `admin@${rRow.slug}.com`),
-    serviceMode: rRow.service_mode || designObj.serviceMode || (rRow.plan === 'vendor' ? 'counter_only' : (localMatch?.serviceMode || 'table_service')),
+    serviceMode: rRow.service_mode || designObj.serviceMode || (rRow.plan === 'vendor' || designObj.plan === 'vendor' ? 'counter_only' : (localMatch?.serviceMode || 'table_service')),
     packagingFeePerPack: rRow.packaging_fee !== undefined ? Number(rRow.packaging_fee) : (designObj.packagingFeePerPack ?? localMatch?.packagingFeePerPack ?? 500),
     deliveryFee: rRow.delivery_fee !== undefined ? Number(rRow.delivery_fee) : (designObj.deliveryFee ?? localMatch?.deliveryFee ?? 1000),
     bankName: rRow.bank_name || designObj.bankName || localMatch?.bankName || '',
@@ -448,7 +448,7 @@ export async function registerRestaurant(data: {
   // 2. Insert into Supabase restaurants table
   if (supabase) {
     try {
-      // First attempt: include plan, table_limit, and owner email
+      // First attempt: include plan, table_limit, and owner email, plus dual-write in design JSONB
       let { error: insErr } = await supabase.from('restaurants').insert([
         {
           id: newId,
@@ -457,17 +457,18 @@ export async function registerRestaurant(data: {
           owner_email: data.email?.trim() || undefined,
           name: data.name.trim(),
           slug: cleanSlug,
-          tagline: data.tagline?.trim() || 'Kitchen & Bar',
+          tagline: data.tagline?.trim() || (initialServiceMode === 'counter_only' ? 'Street Vendor / Stall' : 'Kitchen & Bar'),
           logo: data.logo || '🍽️',
           currency: data.currency || '₦',
           plan: initialPlan,
           table_limit: initialTableLimit,
           service_mode: initialServiceMode,
+          design: { plan: initialPlan, serviceMode: initialServiceMode },
         }
       ]);
 
       // If 'plan' or 'table_limit' columns do not exist in Supabase (PostgreSQL error 42703),
-      // retry with base schema columns so restaurant creation ALWAYS succeeds!
+      // retry with base schema columns + design JSONB so restaurant creation ALWAYS succeeds!
       if (insErr && (insErr.code === '42703' || insErr.message?.includes('column') || insErr.message?.includes('plan'))) {
         console.warn('Note: restaurants.plan column not yet added to Supabase. Inserting with base schema.');
         const retry = await supabase.from('restaurants').insert([
@@ -476,9 +477,10 @@ export async function registerRestaurant(data: {
             owner_id: ownerId,
             name: data.name.trim(),
             slug: cleanSlug,
-            tagline: data.tagline?.trim() || 'Kitchen & Bar',
+            tagline: data.tagline?.trim() || (initialServiceMode === 'counter_only' ? 'Street Vendor / Stall' : 'Kitchen & Bar'),
             logo: data.logo || '🍽️',
             currency: data.currency || '₦',
+            design: { plan: initialPlan, serviceMode: initialServiceMode },
           }
         ]);
         insErr = retry.error;
