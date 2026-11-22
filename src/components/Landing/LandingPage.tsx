@@ -582,8 +582,8 @@ export const LandingPage: React.FC<{ onOpenPricing?: () => void }> = ({ onOpenPr
 
             <div className="mb-4">
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 font-mono">Restaurant Portal</span>
-              <h2 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 mt-0.5">Staff & Kitchen Sign In</h2>
-              <p className="text-stone-500 text-xs mt-1">Access your live Kitchen KDS and table QR manager.</p>
+              <h2 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 mt-0.5">Venue & Kitchen Sign In</h2>
+              <p className="text-stone-500 text-xs mt-1">Sign in with your email or brand slug to access your dashboard & kitchen.</p>
             </div>
 
             {errorMsg && (
@@ -601,10 +601,10 @@ export const LandingPage: React.FC<{ onOpenPricing?: () => void }> = ({ onOpenPr
                   autoComplete="username"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="e.g. backyardgrill or manager@email.com"
+                  placeholder="e.g. kfc@gmail.com or orion-kitchen"
                   className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-base sm:text-sm text-stone-900 focus:outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900 transition-colors"
                 />
-                <span className="block text-[11px] text-stone-400 mt-1">Enter your restaurant slug or the owner email address.</span>
+                <span className="block text-[11px] text-stone-400 mt-1">Works for both restaurants 🍽️ and street vendors ⚡</span>
               </div>
 
               <div>
@@ -624,7 +624,7 @@ export const LandingPage: React.FC<{ onOpenPricing?: () => void }> = ({ onOpenPr
                 disabled={loading}
                 className="w-full py-3.5 bg-[#0c2e22] hover:bg-[#124231] text-[#D4AF37] font-bold rounded-xl text-sm transition-all shadow-md active:scale-98 disabled:opacity-50 mt-2 border border-[#D4AF37]/35 cursor-pointer"
               >
-                {loading ? 'Authenticating...' : 'Sign In to Kitchen →'}
+                {loading ? 'Authenticating...' : 'Sign In to Dashboard →'}
               </button>
             </form>
 

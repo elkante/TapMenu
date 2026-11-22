@@ -291,7 +291,9 @@ export const KitchenDisplay: React.FC<Props> = ({
 
   const currencySymbol = activeRestaurant?.design?.currencySymbol || '₦';
   const restaurantName = activeRestaurant?.name || 'Kitchen';
-  const isVendor = activeRestaurant?.serviceMode === 'counter_only' || activeRestaurant?.plan === 'vendor';
+  const isVendor = activeRestaurant?.serviceMode === 'counter_only' || 
+    (activeRestaurant?.plan || '').toLowerCase().includes('vendor') ||
+    (activeRestaurant?.design as any)?.serviceMode === 'counter_only';
 
   useEffect(() => {
     const t = setInterval(() => {

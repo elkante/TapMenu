@@ -76,7 +76,9 @@ export const RestaurantDashboard: React.FC = () => {
     showNotification 
   } = useApp();
 
-  const isVendor = activeRestaurant?.serviceMode === 'counter_only' || activeRestaurant?.plan === 'vendor';
+  const isVendor = activeRestaurant?.serviceMode === 'counter_only' || 
+    (activeRestaurant?.plan || '').toLowerCase().includes('vendor') ||
+    (activeRestaurant?.design as any)?.serviceMode === 'counter_only';
 
   const [activeTab, setActiveTab] = useState<'kds' | 'menu' | 'inventory' | 'expenses' | 'archive' | 'tables' | 'settings'>('kds');
   const [copiedSlug, setCopiedSlug] = useState(false);

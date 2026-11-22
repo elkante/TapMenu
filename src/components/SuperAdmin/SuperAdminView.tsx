@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { RestaurantTenant } from '../../types';
 import { sanitizeRestaurantLogo } from '../../utils/logoSanitizer';
@@ -422,7 +422,7 @@ export const SuperAdminView: React.FC = () => {
   const handleLoginAs = (tenant: RestaurantTenant) => {
     setActiveSession({
       userId: `admin-${tenant.id}`,
-      email: `admin@${tenant.slug}.com`,
+      email: tenant.ownerEmail || `admin@${tenant.slug}.com`,
       restaurantId: tenant.id,
       restaurantSlug: tenant.slug
     });
@@ -430,11 +430,15 @@ export const SuperAdminView: React.FC = () => {
     window.location.href = '/';
   };
 
-  const isVendorTenant = (t: RestaurantTenant) => 
-    t.plan === 'vendor' || 
-    t.plan === 'vendor-monthly' || 
-    t.plan === 'vendor-pro' || 
-    t.serviceMode === 'counter_only';
+  const isVendorTenant = (t: RestaurantTenant) => {
+    const pl = (t.plan || '').toLowerCase();
+    return pl === 'vendor' || 
+      pl === 'vendor-monthly' || 
+      pl === 'vendor-pro' || 
+      t.serviceMode === 'counter_only' ||
+      (t.design as any)?.serviceMode === 'counter_only' ||
+      (t.design as any)?.plan === 'vendor';
+  };
 
   const vendorCount = tenants.filter(isVendorTenant).length;
   const restaurantCount = tenants.filter(t => !isVendorTenant(t)).length;

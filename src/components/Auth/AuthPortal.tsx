@@ -133,12 +133,12 @@ export const AuthPortal: React.FC = () => {
       <main className="max-w-md mx-auto w-full my-auto py-8">
         <div className="text-center mb-6">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            {tab === 'signup' ? 'Launch Your Digital Menu' : 'Restaurant Portal Login'}
+            {tab === 'signup' ? 'Launch Your Digital Menu' : 'Owner Portal — Sign In'}
           </h1>
           <p className="text-xs sm:text-sm text-neutral-400 mt-1.5 max-w-sm mx-auto">
             {tab === 'signup'
               ? 'Get a dedicated URL, QR codes, and a live kitchen display in seconds.'
-              : 'Log in to manage your menu, orders, and kitchen display.'}
+              : 'Sign in to manage your menu, orders, and live kitchen display.'}
           </p>
         </div>
 
@@ -378,14 +378,14 @@ export const AuthPortal: React.FC = () => {
             <div>
               <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-amber-400" />
-                <span>Email or Slug *</span>
+                <span>Email or Venue Slug *</span>
               </label>
               <input
                 type="text"
                 required
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="owner@restaurant.com or slug"
+                placeholder="owner@example.com or brand-slug"
                 className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500"
               />
             </div>
