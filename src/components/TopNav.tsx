@@ -189,17 +189,17 @@ export const TopNav: React.FC<{
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
-                setCurrentView('quick');
+                setCurrentView('quick_menu');
               }}
               className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors flex items-center justify-between ${
-                currentView === 'quick' ? 'bg-amber-50 text-amber-900 font-bold border border-amber-200/60' : 'hover:bg-neutral-100'
+                currentView === 'quick_menu' ? 'bg-amber-50 text-amber-900 font-bold border border-amber-200/60' : 'hover:bg-neutral-100'
               }`}
             >
               <div className="flex items-center gap-2">
                 <UtensilsCrossed className="w-4 h-4 text-amber-700" />
                 <span>Fast Grid Menu</span>
               </div>
-              {currentView === 'quick' && <Check className="w-3.5 h-3.5 text-amber-700" />}
+              {currentView === 'quick_menu' && <Check className="w-3.5 h-3.5 text-amber-700" />}
             </button>
 
             <button

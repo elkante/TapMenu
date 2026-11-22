@@ -154,7 +154,7 @@ const MainContent: React.FC = () => {
 
       {/* Customer View: Flipbook or Fast Scroll Quick Menu */}
       <main className="flex-1 w-full max-w-full overflow-x-hidden">
-        {currentView === 'quick' ? (
+        {currentView === 'quick_menu' ? (
           <QuickMenuView onSelectItem={handleOpenItem} />
         ) : (
           <FlipbookViewer />

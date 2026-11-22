@@ -11,6 +11,7 @@ import {
   registerRestaurant,
   fetchPlatformContactConfig,
   savePlatformContactConfig,
+  syncRestaurantMetaToSupabase,
   PlatformContactConfig,
   DEFAULT_PLATFORM_CONTACT,
   supabase
@@ -53,7 +54,9 @@ import {
   Eye,
   Save,
   RotateCcw,
-  AlertCircle
+  AlertCircle,
+  QrCode,
+  X
 } from 'lucide-react';
 
 // Cryptographic Salt & Precomputed SHA-256 Hashes
@@ -120,6 +123,7 @@ export const SuperAdminView: React.FC = () => {
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPlan, setNewPlan] = useState<'Basic' | 'Standard' | 'Premium' | 'Enterprise'>('Standard');
+  const [qrModalTenant, setQrModalTenant] = useState<RestaurantTenant | null>(null);
 
   // Load all restaurants from Supabase (merging local cache)
   const loadAllTenants = async () => {

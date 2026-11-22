@@ -28,7 +28,7 @@ export interface OwnerSession {
  * Convert a File object from an <input type="file"> to a base64 Data URL.
  * Works immediately on all devices and offline without needing storage bucket configs.
  */
-export function fileToDataUrl(file: File): Promise<string> {
+export function fileToDataUrl(file: File, maxWidth = 1000, quality = 0.82): Promise<string> {
   return new Promise((resolve, reject) => {
     // If not an image, read directly
     if (!file.type.startsWith('image/')) {
@@ -46,11 +46,11 @@ export function fileToDataUrl(file: File): Promise<string> {
         return resolve(rawUrl);
       }
 
-      // Resize/compress to max 900px dimension and ~82% JPEG quality
+      // Resize/compress to max dimension and quality
       // This reduces 5-10MB phone uploads to 80-150KB for instant Supabase sync
       const img = new Image();
       img.onload = () => {
-        const maxDim = 900;
+        const maxDim = maxWidth;
         let width = img.width;
         let height = img.height;
 

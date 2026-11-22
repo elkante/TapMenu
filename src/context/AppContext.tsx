@@ -108,8 +108,10 @@ interface AppContextType {
       vat?: number;
       orderType?: 'dine_in' | 'takeaway' | 'both' | 'delivery';
       packagingFee?: number;
+      deliveryFee?: number;
       packCount?: number;
       deliveryAddress?: string;
+      paymentProofUrl?: string;
     }
   ) => Order | null;
   callWaiter: (reason: WaiterCall['reason']) => void;
@@ -802,7 +804,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 5. Lightweight KDS / Kitchen heartbeat: checks every 3.5s for fresh incoming orders
     // Guarantees instant chime & delivery even when mobile browser websockets drop or sleep
     let heartbeatTimer: any = null;
-    const isStaffKds = !isCustomerRoute || currentView === 'orders' || currentView === 'dashboard';
+    const isStaffKds = !isCustomerRoute || (currentView as string) === 'orders' || (currentView as string) === 'dashboard';
     if (isStaffKds) {
       heartbeatTimer = setInterval(async () => {
         if (!isMounted) return;
@@ -1419,6 +1421,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       vat?: number;
       orderType?: 'dine_in' | 'takeaway' | 'both' | 'delivery';
       packagingFee?: number;
+      deliveryFee?: number;
       packCount?: number;
       deliveryAddress?: string;
       paymentProofUrl?: string;
@@ -1428,8 +1431,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const calcSubtotal = extraDetails?.subtotal ?? cart.reduce((sum, ci) => sum + (ci.foodItem?.price ?? (ci as any).price ?? 0) * ci.quantity, 0);
     const packagingFee = extraDetails?.packagingFee ?? 0;
-    const calcVat = extraDetails?.vat ?? Math.round((calcSubtotal + packagingFee) * 0.075);
-    const total = calcSubtotal + packagingFee + calcVat;
+    const deliveryFee = extraDetails?.deliveryFee ?? 0;
+    const calcVat = extraDetails?.vat ?? Math.round((calcSubtotal + packagingFee + deliveryFee) * 0.075);
+    const total = calcSubtotal + packagingFee + deliveryFee + calcVat;
     const orderType = extraDetails?.orderType || 'dine_in';
     const isCounterMode = activeRestaurant.serviceMode === 'counter_only';
 
@@ -1473,6 +1477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       source: isNfcSource ? 'nfc' : 'qr',
       orderType,
       packagingFee: packagingFee > 0 ? packagingFee : undefined,
+      deliveryFee: deliveryFee > 0 ? deliveryFee : undefined,
       packCount: extraDetails?.packCount,
       deliveryAddress: extraDetails?.deliveryAddress?.trim() || undefined,
       paymentProofUrl: extraDetails?.paymentProofUrl,

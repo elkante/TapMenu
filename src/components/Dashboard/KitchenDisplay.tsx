@@ -258,128 +258,6 @@ const TicketCard: React.FC<{
           <span>{nextLabel}</span>
         </button>
       </div>
-      {/* ── Active Service Requests Modal ──────────────────────── */}
-      {viewingCallsModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-neutral-750 w-full max-w-lg rounded-3xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                  <PhoneCall className="w-4 h-4" />
-                </div>
-                <h3 className="font-bold text-white text-base">Active Customer Requests ({restaurantCalls.length})</h3>
-              </div>
-              <button 
-                onClick={() => setViewingCallsModal(false)}
-                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
-              {restaurantCalls.map(c => (
-                <div key={c.id} className="p-3.5 rounded-2xl bg-neutral-800/80 border border-neutral-700/60 flex items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-lg bg-amber-400 text-neutral-950 font-black text-xs font-mono">
-                        {c.tableNumber}
-                      </span>
-                      <span className="font-bold text-white text-sm">
-                        {c.reason === 'water' ? '💧 Water Request' :
-                         c.reason === 'bill' ? '🧾 Bill / Check' :
-                         c.reason === 'napkins' ? '🧻 Napkins / Cutlery' :
-                         '🛎️ Waiter Assistance'}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-neutral-400 font-mono block">
-                      Requested at: {c.timestamp || 'Just now'}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      resolveWaiterCall(c.id);
-                      if (restaurantCalls.length <= 1) setViewingCallsModal(false);
-                    }}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-sm shrink-0"
-                  >
-                    ✓ Resolve
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                onClick={() => setViewingCallsModal(false)}
-                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-xs font-bold"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Transfer Payment Receipt Inspection Modal ─────────── */}
-      {proofModalOrder && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-neutral-750 w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-              <div>
-                <h3 className="font-bold text-white text-base">Bank Transfer Receipt</h3>
-                <p className="text-xs text-neutral-400 font-mono">Order #{proofModalOrder.id} · {proofModalOrder.tableNumber}</p>
-              </div>
-              <button 
-                onClick={() => setProofModalOrder(null)}
-                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="rounded-2xl overflow-hidden border border-neutral-750 bg-black flex items-center justify-center max-h-[50vh]">
-              {proofModalOrder.paymentProofUrl ? (
-                <img 
-                  src={proofModalOrder.paymentProofUrl} 
-                  alt="Payment Receipt" 
-                  className="w-full h-auto object-contain max-h-[50vh]"
-                />
-              ) : (
-                <div className="p-8 text-center text-neutral-500 text-xs">No screenshot uploaded.</div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between text-xs bg-neutral-800/80 p-3 rounded-xl border border-neutral-700">
-              <span className="text-neutral-400">Total Due:</span>
-              <span className="font-mono font-black text-amber-400 text-sm">
-                {currencySymbol}{Number(proofModalOrder.total || 0).toLocaleString()}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  proofModalOrder.paymentVerified = true;
-                  setProofModalOrder(null);
-                }}
-                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-md"
-              >
-                ✓ Confirm & Verify Payment
-              </button>
-              <button
-                type="button"
-                onClick={() => setProofModalOrder(null)}
-                className="px-4 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs rounded-xl"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -691,6 +569,7 @@ export const KitchenDisplay: React.FC<Props> = ({
                   onStatus={updateOrderStatus}
                   onPrint={handlePrintTicket}
                   currencySymbol={currencySymbol}
+                  onInspectProof={setProofModalOrder}
                 />
               ));
             })()
@@ -739,6 +618,7 @@ export const KitchenDisplay: React.FC<Props> = ({
                         onStatus={updateOrderStatus}
                         onPrint={handlePrintTicket}
                         currencySymbol={currencySymbol}
+                        onInspectProof={setProofModalOrder}
                       />
                     ))
                   )}
@@ -787,6 +667,129 @@ export const KitchenDisplay: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
+      {/* ── Active Service Requests Modal ──────────────────────── */}
+      {viewingCallsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-750 w-full max-w-lg rounded-3xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <PhoneCall className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-white text-base">Active Customer Requests ({restaurantCalls.length})</h3>
+              </div>
+              <button 
+                onClick={() => setViewingCallsModal(false)}
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+              {restaurantCalls.map(c => (
+                <div key={c.id} className="p-3.5 rounded-2xl bg-neutral-800/80 border border-neutral-700/60 flex items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-lg bg-amber-400 text-neutral-950 font-black text-xs font-mono">
+                        {c.tableNumber}
+                      </span>
+                      <span className="font-bold text-white text-sm">
+                        {String(c.reason).toLowerCase().includes('water') ? '💧 Water Request' :
+                         String(c.reason).toLowerCase().includes('bill') ? '🧾 Bill / Check' :
+                         String(c.reason).toLowerCase().includes('napkin') ? '🧻 Napkins / Cutlery' :
+                         c.reason || '🛎️ Waiter Assistance'}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-neutral-400 font-mono block">
+                      Requested at: {c.timestamp || 'Just now'}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      resolveWaiterCall(c.id);
+                      if (restaurantCalls.length <= 1) setViewingCallsModal(false);
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-sm shrink-0"
+                  >
+                    ✓ Resolve
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setViewingCallsModal(false)}
+                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-xs font-bold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Transfer Payment Receipt Inspection Modal ─────────── */}
+      {proofModalOrder && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-750 w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <div>
+                <h3 className="font-bold text-white text-base">Bank Transfer Receipt</h3>
+                <p className="text-xs text-neutral-400 font-mono">Order #{proofModalOrder.id} · {proofModalOrder.tableNumber}</p>
+              </div>
+              <button 
+                onClick={() => setProofModalOrder(null)}
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden border border-neutral-750 bg-black flex items-center justify-center max-h-[50vh]">
+              {proofModalOrder.paymentProofUrl ? (
+                <img 
+                  src={proofModalOrder.paymentProofUrl} 
+                  alt="Payment Receipt" 
+                  className="w-full h-auto object-contain max-h-[50vh]"
+                />
+              ) : (
+                <div className="p-8 text-center text-neutral-500 text-xs">No screenshot uploaded.</div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-xs bg-neutral-800/80 p-3 rounded-xl border border-neutral-700">
+              <span className="text-neutral-400">Total Due:</span>
+              <span className="font-mono font-black text-amber-400 text-sm">
+                {currencySymbol}{Number(proofModalOrder.total || 0).toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  proofModalOrder.paymentVerified = true;
+                  setProofModalOrder(null);
+                }}
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-md"
+              >
+                ✓ Confirm & Verify Payment
+              </button>
+              <button
+                type="button"
+                onClick={() => setProofModalOrder(null)}
+                className="px-4 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs rounded-xl"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

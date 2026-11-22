@@ -1029,7 +1029,7 @@ export const RestaurantDashboard: React.FC = () => {
             <button
               onClick={() => setActiveTab('kds')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                activeTab === 'kds'
+                (activeTab as string) === 'kds'
                   ? 'bg-amber-500 text-neutral-950 shadow-sm'
                   : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
               }`}
@@ -1040,7 +1040,7 @@ export const RestaurantDashboard: React.FC = () => {
               </div>
               {activeOrders.length > 0 && (
                 <span className={`px-1.5 py-0.5 rounded-full font-mono text-[10px] font-extrabold ${
-                  activeTab === 'kds' ? 'bg-neutral-950 text-white' : 'bg-amber-500 text-neutral-950'
+                  (activeTab as string) === 'kds' ? 'bg-neutral-950 text-white' : 'bg-amber-500 text-neutral-950'
                 }`}>
                   {activeOrders.length}
                 </span>
@@ -1146,7 +1146,7 @@ export const RestaurantDashboard: React.FC = () => {
         {/* ========================================================= */}
         {/* TAB 1: KITCHEN DISPLAY SYSTEM (KDS) */}
         {/* ========================================================= */}
-        {activeTab === 'kds' && (
+        {(activeTab as string) === 'kds' && (
           <div className="space-y-4">
             {/* Waiter Buzzer Banner */}
             {!isVendor && restaurantCalls.length > 0 && (
@@ -2755,7 +2755,7 @@ export const RestaurantDashboard: React.FC = () => {
                 <button
                   onClick={() => { setActiveTab('kds'); setIsMobileDrawerOpen(false); }}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                    activeTab === 'kds'
+                    (activeTab as string) === 'kds'
                       ? 'bg-amber-500 text-neutral-950 shadow-sm'
                       : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
                   }`}
@@ -2766,7 +2766,7 @@ export const RestaurantDashboard: React.FC = () => {
                   </div>
                   {activeOrders.length > 0 && (
                     <span className={`px-1.5 py-0.5 rounded-full font-mono text-[10px] font-extrabold ${
-                      activeTab === 'kds' ? 'bg-neutral-950 text-white' : 'bg-amber-500 text-neutral-950'
+                      (activeTab as string) === 'kds' ? 'bg-neutral-950 text-white' : 'bg-amber-500 text-neutral-950'
                     }`}>
                       {activeOrders.length}
                     </span>
