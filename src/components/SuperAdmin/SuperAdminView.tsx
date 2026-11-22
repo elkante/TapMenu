@@ -432,6 +432,10 @@ export const SuperAdminView: React.FC = () => {
 
   const isVendorTenant = (t: RestaurantTenant) => {
     const pl = (t.plan || '').toLowerCase();
+    // If it has any dine-in plan, it is ALWAYS a dine-in restaurant, NEVER a street vendor
+    if (pl.includes('basic') || pl.includes('standard') || pl.includes('premium') || pl.includes('enterprise')) {
+      return false;
+    }
     return pl === 'vendor' || 
       pl === 'vendor-monthly' || 
       pl === 'vendor-pro' || 
@@ -2123,10 +2127,7 @@ export const SuperAdminView: React.FC = () => {
       {/* ── Admin QR & Links Popup Modal ── */}
       {qrModalTenant && (() => {
         const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tapmenu.me';
-        const isVendorModal = qrModalTenant.plan === 'vendor' ||
-          qrModalTenant.plan === 'vendor-monthly' ||
-          qrModalTenant.plan === 'vendor-pro' ||
-          qrModalTenant.serviceMode === 'counter_only';
+        const isVendorModal = isVendorTenant(qrModalTenant);
         const primaryMenuUrl = `${origin}/?r=${qrModalTenant.slug}`;
 
         const downloadTableQr = async (url: string, label: string) => {
@@ -2147,7 +2148,20 @@ export const SuperAdminView: React.FC = () => {
           }
         };
 
-        const tables = qrModalTenant.tables || [];
+        const rawTables = qrModalTenant.tables || [];
+        const tables = !isVendorModal && rawTables.length === 0
+          ? [1, 2, 3, 4, 5].map(num => ({
+              id: `tbl-${qrModalTenant.id}-${num}`,
+              tableNumber: `Table ${num}`,
+              label: `Table ${num}`,
+              section: 'Dining Area',
+              ntagSerial: `04:FA:${num.toString().padStart(2, '0')}:88:22:90:${num.toString().padStart(2, '0')}`,
+              nfcStatus: 'active' as const,
+              totalTaps: 0,
+              totalScans: 0,
+              urlPayload: `${origin}/?r=${qrModalTenant.slug}&table=Table+${num}`
+            }))
+          : rawTables;
 
         return (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">

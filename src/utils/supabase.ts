@@ -256,14 +256,20 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
   }
 
   const designObj = (typeof rRow.design === 'object' && rRow.design !== null) ? rRow.design : {};
-  const isVendor = rRow.plan === 'vendor' || 
-                   rRow.plan === 'vendor-monthly' || 
-                   rRow.plan === 'vendor-pro' || 
-                   rRow.service_mode === 'counter_only' || 
-                   designObj.plan === 'vendor' || 
-                   designObj.serviceMode === 'counter_only' ||
-                   localMatch?.plan === 'vendor' ||
-                   localMatch?.serviceMode === 'counter_only';
+  const effectivePlan = ((rRow.plan || designObj.plan || localMatch?.plan || 'basic') as string).toLowerCase();
+
+  const isDineInPlan = effectivePlan.includes('basic') || 
+                       effectivePlan.includes('standard') || 
+                       effectivePlan.includes('premium') || 
+                       effectivePlan.includes('enterprise');
+
+  const isVendor = !isDineInPlan && (
+    effectivePlan === 'vendor' || 
+    effectivePlan === 'vendor-monthly' || 
+    effectivePlan === 'vendor-pro' || 
+    rRow.service_mode === 'counter_only' || 
+    designObj.serviceMode === 'counter_only'
+  );
 
   // Preserve user-generated tables across logouts & refreshes (Dine-in only)
   let tables: any[] = [];
@@ -308,7 +314,7 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
   const accentColor = rRow.accent_color || designObj.accentColor || localMatch?.design?.accentColor || '#d4af37';
 
   const rawLogo = rRow.logo || localMatch?.logo || '';
-  const cleanLogo = sanitizeRestaurantLogo(rawLogo, '🍽️');
+  const cleanLogo = sanitizeRestaurantLogo(rawLogo, isVendor ? '⚡' : '🍽️');
 
   // Auto-heal corrupt logo in Supabase database in background
   if (typeof window !== 'undefined' && supabase && rRow.id && rawLogo && rawLogo !== cleanLogo) {
@@ -321,7 +327,7 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
     id: rRow.id,
     slug: rRow.slug,
     name: rRow.name,
-    tagline: rRow.tagline || 'Kitchen & Bar',
+    tagline: rRow.tagline || (isVendor ? 'Street Vendor / Stall' : 'Kitchen & Bar'),
     logo: cleanLogo,
     coverImage: rRow.cover_image || localMatch?.coverImage || '',
     address: rRow.address || localMatch?.address || '',
@@ -331,7 +337,7 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
     tableLimit: isVendor ? undefined : ((rRow.table_limit !== undefined && rRow.table_limit !== null) ? Number(rRow.table_limit) : undefined),
     status: (rRow.status as any) || 'active',
     ownerEmail: rRow.email || rRow.owner_email || localMatch?.ownerEmail || (rRow.owner_id ? undefined : `admin@${rRow.slug}.com`),
-    serviceMode: isVendor ? 'counter_only' : (rRow.service_mode || designObj.serviceMode || localMatch?.serviceMode || 'table_service'),
+    serviceMode: isVendor ? 'counter_only' : 'table_service',
     packagingFeePerPack: rRow.packaging_fee !== undefined ? Number(rRow.packaging_fee) : (designObj.packagingFeePerPack ?? localMatch?.packagingFeePerPack ?? 500),
     deliveryFee: rRow.delivery_fee !== undefined ? Number(rRow.delivery_fee) : (designObj.deliveryFee ?? localMatch?.deliveryFee ?? 1000),
     bankName: rRow.bank_name || designObj.bankName || localMatch?.bankName || '',
