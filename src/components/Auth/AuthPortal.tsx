@@ -8,6 +8,7 @@ import {
   Store, 
   KeyRound, 
   Mail, 
+  Phone,
   Globe, 
   Coins, 
   CheckCircle2, 
@@ -32,6 +33,7 @@ export const AuthPortal: React.FC = () => {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [currency, setCurrency] = useState('₦');
 
@@ -59,6 +61,7 @@ export const AuthPortal: React.FC = () => {
         name,
         slug,
         email,
+        phone,
         password,
         currency,
         plan: isVendor ? 'vendor' : 'basic',
@@ -295,6 +298,22 @@ export const AuthPortal: React.FC = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="owner@example.com"
+                    className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Phone / WhatsApp Number */}
+                <div>
+                  <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-amber-400" />
+                    <span>WhatsApp / Phone Number *</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. +234 801 234 5678"
                     className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500"
                   />
                 </div>

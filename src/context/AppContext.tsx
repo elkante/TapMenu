@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { 
   RestaurantTenant, 
   MenuBookDesign, 
@@ -185,6 +185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [currentView, setCurrentView] = useState<AppViewMode>('flipbook');
+  const vendorDefaultViewAppliedRef = useRef<string | null>(null);
   const [currentTable, setCurrentTable] = useState<string | null>(null);
   const [isNfcSource, setIsNfcSource] = useState<boolean>(false);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -365,7 +366,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         r.slug.toLowerCase() === requestedSlug.toLowerCase() || 
         r.id === requestedSlug
       );
-      if (match) return match;
+      if (match) {
+        return {
+          ...match,
+          logo: sanitizeRestaurantLogo(match.logo, '🍽️')
+        };
+      }
 
       // â”€â”€ Instant Customer View (0ms feedback) â”€â”€
       // Derive restaurant name immediately from URL slug so customer sees the restaurant name at 0ms!
@@ -404,6 +410,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       logo: sanitizeRestaurantLogo(chosen.logo, '🍽️')
     };
   }, [restaurants, activeRestaurantId, isCustomerRoute, requestedSlug, ownerSession]);
+
+  // Default customer view for Vendor / Counter Mode accounts to Quick Menu so all dishes are immediately visible on QR scan
+  useEffect(() => {
+    if (!isCustomerRoute || !activeRestaurant?.id) return;
+    const isCounterVendor =
+      activeRestaurant.serviceMode === 'counter_only' ||
+      (activeRestaurant.design as any)?.serviceMode === 'counter_only' ||
+      (activeRestaurant.plan || '').toLowerCase().includes('vendor');
+    if (isCounterVendor && vendorDefaultViewAppliedRef.current !== activeRestaurant.id) {
+      vendorDefaultViewAppliedRef.current = activeRestaurant.id;
+      setCurrentView('quick_menu');
+    }
+  }, [isCustomerRoute, activeRestaurant?.id, activeRestaurant?.serviceMode, activeRestaurant?.plan]);
 
   // Real-time synchronization: Supabase Realtime + Multi-tab BroadcastChannel + Local Storage + Polling fallback
   useEffect(() => {

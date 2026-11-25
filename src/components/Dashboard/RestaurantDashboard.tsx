@@ -78,27 +78,29 @@ export const RestaurantDashboard: React.FC = () => {
   } = useApp();
 
   const rawPlan = (activeRestaurant?.plan || '').toLowerCase();
-  const isDineInPlan = rawPlan.includes('basic') || rawPlan.includes('standard') || rawPlan.includes('premium') || rawPlan.includes('enterprise');
-  const isVendor = !isDineInPlan && (
-    activeRestaurant?.serviceMode === 'counter_only' || 
-    rawPlan.includes('vendor') ||
-    (activeRestaurant?.design as any)?.serviceMode === 'counter_only'
-  );
+  const isVendor =
+    activeRestaurant?.serviceMode === 'counter_only' ||
+    (activeRestaurant?.design as any)?.serviceMode === 'counter_only' ||
+    rawPlan.includes('vendor');
 
   const [activeTab, setActiveTab] = useState<'kds' | 'menu' | 'inventory' | 'expenses' | 'archive' | 'tables' | 'settings' | 'plan'>('kds');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
-  const [planCategoryView, setPlanCategoryView] = useState<'restaurant' | 'vendor'>(isVendor ? 'vendor' : 'restaurant');
   const [switchingPlan, setSwitchingPlan] = useState<string | null>(null);
 
   const handleSwitchPlan = async (newPlanId: string) => {
     if (!activeRestaurant.id) return;
+    const isTargetVendor = newPlanId === 'vendor' || newPlanId === 'vendor-monthly' || newPlanId === 'vendor-pro';
+    if (isTargetVendor !== isVendor) {
+      showNotification('Account type is locked from sign-up and cannot be switched between Vendor and Restaurant.');
+      return;
+    }
+
     setSwitchingPlan(newPlanId);
     try {
-      const isTargetVendor = newPlanId === 'vendor' || newPlanId === 'vendor-monthly' || newPlanId === 'vendor-pro';
-      const targetServiceMode = isTargetVendor ? 'counter_only' : 'table_service';
+      const targetServiceMode = isVendor ? 'counter_only' : 'table_service';
 
       let targetTableLimit: number | null = null;
-      if (!isTargetVendor) {
+      if (!isVendor) {
         if (newPlanId === 'basic') targetTableLimit = 10;
         else if (newPlanId === 'standard') targetTableLimit = 20;
         else if (newPlanId === 'premium') targetTableLimit = 60;
@@ -2512,7 +2514,7 @@ export const RestaurantDashboard: React.FC = () => {
           const tableUsageCount = (activeRestaurant.tables || []).length;
           const maxTablesAlloc = activeRestaurant.tableLimit ?? currentPlanTier?.maxTables ?? (isVendor ? null : 10);
 
-          const displayedPlans = planCategoryView === 'vendor'
+          const displayedPlans = isVendor
             ? getStoredVendorPlans()
             : getStoredPlans();
 
@@ -2671,35 +2673,8 @@ export const RestaurantDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Plan Category Filter (Dine-in vs Street Vendor) */}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPlanCategoryView('restaurant')}
-                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
-                      planCategoryView === 'restaurant'
-                        ? 'bg-neutral-900 text-white shadow-xs'
-                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                    }`}
-                  >
-                    <span>🍽️ Dine-In Restaurant Plans</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPlanCategoryView('vendor')}
-                    className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
-                      planCategoryView === 'vendor'
-                        ? 'bg-amber-500 text-neutral-950 shadow-xs'
-                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                    }`}
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>Street Vendor Plans (Counter)</span>
-                  </button>
-                </div>
-
-                {/* Plan Cards Grid */}
-                <div className={`grid grid-cols-1 md:grid-cols-2 ${planCategoryView === 'restaurant' ? 'lg:grid-cols-4' : 'lg:grid-cols-2 max-w-2xl'} gap-4`}>
+                {/* Plan Cards Grid (strictly locked to sign-up account type) */}
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${!isVendor ? 'lg:grid-cols-4' : 'lg:grid-cols-2 max-w-2xl'} gap-4`}>
                   {displayedPlans.map((p) => {
                     const isCurrent = rawPlanId === p.id || (p.id === 'basic' && rawPlanId === 'basic');
                     const price = billingCycle === 'annual' ? p.annualPrice : p.monthlyPrice;

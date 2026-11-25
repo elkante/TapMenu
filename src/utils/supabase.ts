@@ -259,22 +259,14 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
   const designObj = (typeof rRow.design === 'object' && rRow.design !== null) ? rRow.design : {};
   // Plan is sourced from the dedicated column first (most reliable), then design JSONB, then local cache
   const effectivePlan = ((rRow.plan || designObj.plan || localMatch?.plan || 'basic') as string).toLowerCase();
+  const rawServiceMode = rRow.service_mode || designObj.serviceMode || localMatch?.serviceMode;
 
-  // A dine-in plan ALWAYS overrides any service_mode flag — prevents miscategorisation
-  const isDineInPlan = effectivePlan.includes('basic') ||
-                       effectivePlan.includes('standard') ||
-                       effectivePlan.includes('premium') ||
-                       effectivePlan.includes('enterprise') ||
-                       effectivePlan.includes('growth');
-
-  // Only treat as vendor when plan is explicitly vendor-flavoured AND no dine-in plan detected
-  const isVendor = !isDineInPlan && (
+  // Service mode from sign-up (counter_only) or vendor plan strictly determines vendor account
+  const isVendor =
+    rawServiceMode === 'counter_only' ||
     effectivePlan === 'vendor' ||
     effectivePlan === 'vendor-monthly' ||
-    effectivePlan === 'vendor-pro' ||
-    rRow.service_mode === 'counter_only' ||
-    designObj.serviceMode === 'counter_only'
-  );
+    effectivePlan === 'vendor-pro';
 
   // Background auto-heal: if DB has wrong service_mode for a dine-in plan, correct it silently
   if (isDineInPlan && rRow.service_mode === 'counter_only' && typeof window !== 'undefined' && supabase && rRow.id) {
@@ -364,6 +356,7 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
     accountName: rRow.account_name || designObj.accountName || localMatch?.accountName || '',
     cacCertificateUrl: rRow.cac_certificate_url || designObj.cacCertificateUrl || localMatch?.cacCertificateUrl || '',
     cacStatus: rRow.cac_status || designObj.cacStatus || localMatch?.cacStatus || 'none',
+    subscriptionExpiresAt: rRow.subscription_expires_at || designObj.subscriptionExpiresAt || localMatch?.subscriptionExpiresAt || (rRow.created_at ? new Date(new Date(rRow.created_at).getTime() + 30 * 86400000).toISOString() : new Date(Date.now() + 30 * 86400000).toISOString()),
     quickMenuEnabled: true,
     allowOrdering: true,
     tableOrderingEnabled: true,
@@ -436,6 +429,7 @@ export async function registerRestaurant(data: {
   name: string;
   slug: string;
   email: string;
+  phone?: string;
   password?: string;
   currency?: string;
   tagline?: string;
@@ -457,6 +451,7 @@ export async function registerRestaurant(data: {
   const initialPlan = (data.plan || 'basic').toLowerCase();
   const initialTableLimit = data.tableLimit ?? null;
   const initialServiceMode = data.serviceMode || 'table_service';
+  const defaultExpiresAt = new Date(Date.now() + 30 * 86400000).toISOString(); // 30-day trial/cycle
 
   // 1. Try Supabase Auth
   if (supabase && data.password && data.email) {
@@ -492,6 +487,7 @@ export async function registerRestaurant(data: {
           owner_id: ownerId,
           email: data.email?.trim() || undefined,
           owner_email: data.email?.trim() || undefined,
+          phone: data.phone?.trim() || undefined,
           name: data.name.trim(),
           slug: cleanSlug,
           tagline: data.tagline?.trim() || (initialServiceMode === 'counter_only' ? 'Street Vendor / Stall' : 'Kitchen & Bar'),
@@ -500,7 +496,8 @@ export async function registerRestaurant(data: {
           plan: initialPlan,
           table_limit: initialTableLimit,
           service_mode: initialServiceMode,
-          design: { plan: initialPlan, serviceMode: initialServiceMode },
+          subscription_expires_at: defaultExpiresAt,
+          design: { plan: initialPlan, serviceMode: initialServiceMode, subscriptionExpiresAt: defaultExpiresAt },
         }
       ]);
 
@@ -517,7 +514,8 @@ export async function registerRestaurant(data: {
             tagline: data.tagline?.trim() || (initialServiceMode === 'counter_only' ? 'Street Vendor / Stall' : 'Kitchen & Bar'),
             logo: data.logo || '🍽️',
             currency: data.currency || '₦',
-            design: { plan: initialPlan, serviceMode: initialServiceMode },
+            phone: data.phone?.trim() || undefined,
+            design: { plan: initialPlan, serviceMode: initialServiceMode, subscriptionExpiresAt: defaultExpiresAt },
           }
         ]);
         insErr = retry.error;

@@ -256,3 +256,20 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.kitchen_inventory;
   END IF;
 END $$;
+
+-- =========================================================================
+-- Security Definer Function: Admin User Purge
+-- Allows purging auth.users when a restaurant account is deleted by administration
+-- =========================================================================
+CREATE OR REPLACE FUNCTION public.admin_delete_user(target_user_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  DELETE FROM auth.users WHERE id = target_user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_delete_user(UUID) TO anon, authenticated, service_role;
+

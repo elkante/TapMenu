@@ -292,12 +292,10 @@ export const KitchenDisplay: React.FC<Props> = ({
   const currencySymbol = activeRestaurant?.design?.currencySymbol || '₦';
   const restaurantName = activeRestaurant?.name || 'Kitchen';
   const rawPlan = (activeRestaurant?.plan || '').toLowerCase();
-  const isDineInPlan = rawPlan.includes('basic') || rawPlan.includes('standard') || rawPlan.includes('premium') || rawPlan.includes('enterprise');
-  const isVendor = !isDineInPlan && (
-    activeRestaurant?.serviceMode === 'counter_only' || 
-    rawPlan.includes('vendor') ||
-    (activeRestaurant?.design as any)?.serviceMode === 'counter_only'
-  );
+  const isVendor =
+    activeRestaurant?.serviceMode === 'counter_only' ||
+    (activeRestaurant?.design as any)?.serviceMode === 'counter_only' ||
+    rawPlan.includes('vendor');
 
   useEffect(() => {
     const t = setInterval(() => {
