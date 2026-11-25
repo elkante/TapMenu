@@ -28,12 +28,14 @@ interface KitchenArchiveViewProps {
   orders: Order[];
   restaurant: RestaurantTenant;
   onPrintOrderReceipt: (order: Order) => void;
+  showNotification?: (msg: string) => void;
 }
 
 export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
   orders,
   restaurant,
-  onPrintOrderReceipt
+  onPrintOrderReceipt,
+  showNotification
 }) => {
   const [filterMode, setFilterMode] = useState<'day' | 'month' | 'year'>('day');
   const todayStr = getNetworkDateString();
@@ -203,7 +205,7 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    if (typeof showNotification === 'function') {
+    if (showNotification) {
       showNotification('📥 CSV Spreadsheet downloaded successfully!');
     }
   };
@@ -597,7 +599,7 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
           printWindow.print();
         }, 300);
       };
-      if (typeof showNotification === 'function') {
+      if (showNotification) {
         showNotification('📄 Print / Save as PDF window opened!');
       }
     } else {

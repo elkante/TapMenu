@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { sanitizeRestaurantLogo } from '../../utils/logoSanitizer';
-import { setActiveSession, saveStoredRestaurants, fileToDataUrl, saveDishToSupabase, deleteDishFromSupabase, saveShiftToSupabase, syncAllDishesToSupabase, updateRestaurantPlanInSupabase, syncRestaurantMetaToSupabase } from '../../utils/supabase';
+import { setActiveSession, getStoredRestaurants, saveStoredRestaurants, fileToDataUrl, saveDishToSupabase, deleteDishFromSupabase, saveShiftToSupabase, syncAllDishesToSupabase, updateRestaurantPlanInSupabase, syncRestaurantMetaToSupabase } from '../../utils/supabase';
 import { generateQrDataUrl, generateHighResQrDataUrl } from '../../utils/nfc';
 import { getAbsoluteTableUrl, getAbsoluteVendorUrl, getAbsoluteBaseUrl } from '../../utils/canonicalUrl';
-import { getStoredPlans, getStoredVendorPlans, PlanTier } from '../../utils/pricingConfig';
+import { getStoredPlans, getStoredVendorPlans, PlanTier, BillingCycle, getPlanPriceForCycle, getBillingCycleMonths } from '../../utils/pricingConfig';
 import { 
   ChefHat, 
   Utensils, 
@@ -52,6 +52,7 @@ import { KitchenExpenseView } from './KitchenExpenseView';
 import { KitchenArchiveView } from './KitchenArchiveView';
 import { KitchenDisplay } from './KitchenDisplay';
 import { CustomerCrmView } from './CustomerCrmView';
+import { PaystackCheckoutModal } from './PaystackCheckoutModal';
 import { OrderSmartCardsModal } from '../Hardware/OrderSmartCardsModal';
 import { MultiStoreManagerModal } from './MultiStoreManagerModal';
 import { getNetworkVerifiedDate, formatNetworkDate, formatNetworkTime } from '../../utils/networkTime';
@@ -225,8 +226,36 @@ export const RestaurantDashboard: React.FC = () => {
 
   // ── end PIN Lock System ──────────────────────────────────────────────────────
 
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [isPaystackModalOpen, setIsPaystackModalOpen] = useState(false);
+  const [paystackTargetPlanId, setPaystackTargetPlanId] = useState<string | undefined>(undefined);
+  const [paystackTargetCycle, setPaystackTargetCycle] = useState<BillingCycle>('monthly');
   const [switchingPlan, setSwitchingPlan] = useState<string | null>(null);
+
+  const handleOpenPaystack = (planId?: string, cycle?: BillingCycle) => {
+    setPaystackTargetPlanId(planId || activeRestaurant.plan);
+    if (cycle) setPaystackTargetCycle(cycle);
+    setIsPaystackModalOpen(true);
+  };
+
+  const handlePaymentSuccess = (updated: { plan: string; subscriptionExpiresAt: string }) => {
+    updateRestaurantMeta({
+      plan: updated.plan,
+      subscriptionExpiresAt: updated.subscriptionExpiresAt,
+      status: 'active' as any
+    });
+    const stored = getStoredRestaurants();
+    const updatedStored = stored.map(r => r.id === activeRestaurant.id ? {
+      ...r,
+      plan: updated.plan,
+      subscriptionExpiresAt: updated.subscriptionExpiresAt,
+      status: 'active' as any
+    } : r);
+    saveStoredRestaurants(updatedStored);
+    setIsPaystackModalOpen(false);
+    showNotification(`🎉 Subscription successfully updated to ${updated.plan.toUpperCase()}!`);
+  };
+
   const [expiryBannerDismissed, setExpiryBannerDismissed] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem(`tapmenu_dismiss_expiry_${activeRestaurant?.id}`) === 'true';
@@ -1426,10 +1455,10 @@ export const RestaurantDashboard: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => triggerTabChange('plan')}
+                onClick={() => handleOpenPaystack(activeRestaurant.plan, 'monthly')}
                 className="px-4 py-2 bg-white text-red-700 font-bold text-xs rounded-xl hover:bg-red-50 shrink-0 shadow-sm cursor-pointer"
               >
-                Renew Plan →
+                Renew with Paystack →
               </button>
             </div>
           )}
@@ -1463,12 +1492,12 @@ export const RestaurantDashboard: React.FC = () => {
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => triggerTabChange('plan')}
+                    onClick={() => handleOpenPaystack(activeRestaurant.plan, 'monthly')}
                     className={`px-3.5 py-2 rounded-xl font-black text-xs transition-transform active:scale-95 cursor-pointer shadow-md ${
                       isExp ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-amber-400 hover:bg-amber-300 text-neutral-950'
                     }`}
                   >
-                    Renew Plan →
+                    Renew with Paystack →
                   </button>
                   <button
                     type="button"
@@ -2376,7 +2405,8 @@ export const RestaurantDashboard: React.FC = () => {
           <KitchenArchiveView 
             orders={restaurantOrders.filter(o => o.status === 'served')} 
             restaurant={activeRestaurant} 
-            onPrintOrderReceipt={handlePrintTicket} 
+            onPrintOrderReceipt={handlePrintTicket}
+            showNotification={showNotification} 
           />
         )}
 
@@ -3057,19 +3087,18 @@ export const RestaurantDashboard: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <a
-                          href={`https://wa.me/2348000000000?text=Hi%20TapMenu%20Support!%20I%20would%20like%20to%20renew%20the%20${encodeURIComponent(currentPlanName)}%20plan%20for%20my%20restaurant%20(${encodeURIComponent(activeRestaurant.name)}).`}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPaystack(activeRestaurant.plan, billingCycle)}
                           className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer ${
                             isExpired || isCritical
                               ? 'bg-red-600 hover:bg-red-500 text-white'
                               : 'bg-amber-500 hover:bg-amber-400 text-neutral-950'
                           }`}
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>{isExpired ? 'Renew Plan Now' : 'Extend / Renew Subscription'}</span>
-                        </a>
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>{isExpired ? 'Renew Plan with Paystack' : 'Extend / Renew with Paystack'}</span>
+                        </button>
                       </div>
                     </div>
 
@@ -3107,15 +3136,15 @@ export const RestaurantDashboard: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h3 className="font-extrabold text-neutral-900 text-base">Select or Change Subscription Plan</h3>
-                    <p className="text-xs text-neutral-500">Switch tiers anytime. New table capacity activates immediately.</p>
+                    <p className="text-xs text-neutral-500">Switch or renew tiers anytime via Paystack. New table capacity activates immediately upon verification.</p>
                   </div>
 
-                  {/* Monthly vs Annual Toggle */}
+                  {/* Monthly vs 6 Months vs Annual Toggle */}
                   <div className="inline-flex items-center p-1 bg-neutral-100 border border-neutral-200 rounded-2xl">
                     <button
                       type="button"
                       onClick={() => setBillingCycle('monthly')}
-                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
                         billingCycle === 'monthly'
                           ? 'bg-neutral-900 text-white shadow-xs'
                           : 'text-neutral-600 hover:text-neutral-900'
@@ -3125,8 +3154,20 @@ export const RestaurantDashboard: React.FC = () => {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setBillingCycle('semi-annual')}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 cursor-pointer ${
+                        billingCycle === 'semi-annual'
+                          ? 'bg-neutral-900 text-amber-400 shadow-xs'
+                          : 'text-neutral-600 hover:text-neutral-900'
+                      }`}
+                    >
+                      <span>6 Months</span>
+                      <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-800 text-[9px] font-extrabold">-7%</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setBillingCycle('annual')}
-                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 ${
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 cursor-pointer ${
                         billingCycle === 'annual'
                           ? 'bg-amber-500 text-neutral-950 shadow-xs'
                           : 'text-neutral-600 hover:text-neutral-900'
@@ -3138,12 +3179,30 @@ export const RestaurantDashboard: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Duration Explanation Banner */}
+                {billingCycle === 'semi-annual' && (
+                  <div className="p-3 bg-stone-100 border border-stone-200 rounded-2xl text-xs text-stone-700 flex items-center gap-2">
+                    <span>💡</span>
+                    <span>
+                      <strong>6-Month Plan Selected:</strong> Includes a small upfront discount. Standard features only (no bonus NFC hardware stands or smart cards).
+                    </span>
+                  </div>
+                )}
+                {billingCycle === 'annual' && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      <strong>Annual VIP Plan Selected:</strong> 2 Months Free + Complimentary Smart NFC Cards / Table Stands delivered directly to your venue!
+                    </span>
+                  </div>
+                )}
+
                 {/* Plan Cards Grid (strictly locked to sign-up account type) */}
                 <div className={`grid grid-cols-1 md:grid-cols-2 ${!isVendor ? 'lg:grid-cols-4' : 'lg:grid-cols-2 max-w-2xl'} gap-4`}>
                   {displayedPlans.map((p) => {
                     const isCurrent = rawPlanId === p.id || (p.id === 'basic' && rawPlanId === 'basic');
-                    const price = billingCycle === 'annual' ? p.annualPrice : p.monthlyPrice;
-                    const periodLabel = billingCycle === 'annual' ? '/ year' : '/ month';
+                    const price = getPlanPriceForCycle(p, billingCycle);
+                    const periodLabel = billingCycle === 'annual' ? '/ year' : billingCycle === 'semi-annual' ? '/ 6 mos' : '/ month';
 
                     return (
                       <div
@@ -3186,6 +3245,11 @@ export const RestaurantDashboard: React.FC = () => {
                                 🎁 {p.annualIncentive}
                               </p>
                             )}
+                            {billingCycle === 'semi-annual' && p.sixMonthsIncentive && (
+                              <p className="text-[10px] text-amber-600/90 font-semibold mt-1">
+                                💸 {p.sixMonthsIncentive}
+                              </p>
+                            )}
                           </div>
 
                           <div className={`p-2 rounded-xl text-xs font-semibold ${isCurrent ? 'bg-neutral-950 text-neutral-300' : 'bg-neutral-50 text-neutral-700'}`}>
@@ -3210,29 +3274,24 @@ export const RestaurantDashboard: React.FC = () => {
                           {isCurrent ? (
                             <button
                               type="button"
-                              disabled
-                              className="w-full py-2.5 bg-neutral-800 text-neutral-400 font-bold rounded-xl text-xs cursor-default flex items-center justify-center gap-1.5"
+                              onClick={() => handleOpenPaystack(p.id, billingCycle)}
+                              className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                             >
-                              <Check className="w-3.5 h-3.5 text-amber-400" />
-                              <span>Current Active Plan</span>
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Renew with Paystack</span>
                             </button>
                           ) : (
                             <button
                               type="button"
-                              disabled={switchingPlan !== null}
-                              onClick={() => handleSwitchPlan(p.id)}
+                              onClick={() => handleOpenPaystack(p.id, billingCycle)}
                               className={`w-full py-2.5 font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer ${
                                 p.badge
                                   ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950'
                                   : 'bg-neutral-900 hover:bg-neutral-800 text-white'
                               }`}
                             >
-                              {switchingPlan === p.id ? (
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              )}
-                              <span>Switch to {p.name}</span>
+                              <CreditCard className="w-3.5 h-3.5" />
+                              <span>Choose & Pay with Paystack →</span>
                             </button>
                           )}
                         </div>
@@ -4026,6 +4085,17 @@ export const RestaurantDashboard: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* Paystack Checkout & Renewal Modal */}
+      <PaystackCheckoutModal
+        isOpen={isPaystackModalOpen}
+        onClose={() => setIsPaystackModalOpen(false)}
+        restaurant={activeRestaurant}
+        initialPlanId={paystackTargetPlanId}
+        initialBillingCycle={paystackTargetCycle}
+        onSuccess={handlePaymentSuccess}
+        showNotification={showNotification}
+      />
     </div>
   );
 };

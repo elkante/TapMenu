@@ -310,3 +310,31 @@ BEGIN
   END IF;
 END $$;
 
+-- 11. Subscription Transactions (Paystack Payments & Audit Log)
+CREATE TABLE IF NOT EXISTS public.subscription_transactions (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    restaurant_id TEXT NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    reference TEXT NOT NULL UNIQUE,
+    plan_id TEXT NOT NULL,
+    billing_cycle TEXT NOT NULL,
+    months INT NOT NULL DEFAULT 1,
+    amount_kobo BIGINT NOT NULL,
+    currency TEXT DEFAULT 'NGN',
+    customer_email TEXT,
+    channel TEXT DEFAULT 'paystack',
+    paid_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sub_tx_restaurant ON public.subscription_transactions(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_sub_tx_reference ON public.subscription_transactions(reference);
+ALTER TABLE public.subscription_transactions ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'subscription_transactions' AND policyname = 'Allow public access to subscription_transactions') THEN
+    CREATE POLICY "Allow public access to subscription_transactions" ON public.subscription_transactions FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+

@@ -1,13 +1,17 @@
+export type BillingCycle = 'monthly' | 'semi-annual' | 'annual';
+
 export interface PlanTier {
   id: string;
   name: string;
   category?: 'restaurant' | 'vendor';
   badge?: string;
   monthlyPrice: number; // in NGN
-  annualPrice: number;  // in NGN
+  sixMonthsPrice: number; // 6 months in NGN (slight discount, no extra hardware perks)
+  annualPrice: number;  // in NGN (2 months free + hardware smart cards / stands)
   maxTables: number | null; // null = unlimited
   tagline: string;
   features: string[];
+  sixMonthsIncentive?: string;
   annualIncentive?: string;
   recommended?: boolean;
 }
@@ -18,9 +22,11 @@ export const DEFAULT_VENDOR_PLANS: PlanTier[] = [
     name: 'Vendor Monthly',
     category: 'vendor',
     monthlyPrice: 4000,
+    sixMonthsPrice: 22500, // save 1,500 (6.25% off)
     annualPrice: 40000,
     maxTables: null,
     tagline: 'Ideal for retail pop-ups, food stalls, bakeries & event vendors',
+    sixMonthsIncentive: 'Save ₦1,500 (Small 6% discount · Standard features, no extra perks)',
     annualIncentive: 'Save ₦8,000 (2 Mos Free) + 2 Free NFC Counter Stands (₦14,000 value)',
     features: [
       'Single Counter / Pop-Up Stand Menu',
@@ -39,9 +45,11 @@ export const DEFAULT_VENDOR_PLANS: PlanTier[] = [
     category: 'vendor',
     badge: 'Popular',
     monthlyPrice: 7500,
+    sixMonthsPrice: 42000, // save 3,000 (6.7% off)
     annualPrice: 75000,
     maxTables: null,
     tagline: 'For high-volume vendors, multi-stall setups & busy retail markets',
+    sixMonthsIncentive: 'Save ₦3,000 (Small 7% discount · Standard features, no extra perks)',
     annualIncentive: 'Save ₦15,000 (2 Mos Free) + 5 Free NFC Counter Stands (₦35,000 value)',
     features: [
       'Everything in Vendor Monthly',
@@ -63,9 +71,11 @@ export const DEFAULT_PLANS: PlanTier[] = [
     name: 'Basic',
     category: 'restaurant',
     monthlyPrice: 8000,
+    sixMonthsPrice: 45000, // save 3,000 (6.25% off)
     annualPrice: 80000,
     maxTables: 10,
     tagline: 'Ideal for small cafes, juice bars & neighborhood bistros',
+    sixMonthsIncentive: 'Save ₦3,000 (Small 6% discount · Standard features, no extra perks)',
     annualIncentive: 'Save ₦16,000 (2 Mos Free) + 2 Free Smart Cards (₦14,000 value)',
     features: [
       'Up to 10 Dining Tables',
@@ -84,9 +94,11 @@ export const DEFAULT_PLANS: PlanTier[] = [
     category: 'restaurant',
     badge: 'Popular',
     monthlyPrice: 13000,
+    sixMonthsPrice: 72000, // save 6,000 (7.7% off)
     annualPrice: 130000,
     maxTables: 20,
     tagline: 'Perfect for fast-growing restaurants & casual dining',
+    sixMonthsIncentive: 'Save ₦6,000 (Small 8% discount · Standard features, no extra perks)',
     annualIncentive: 'Save ₦26,000 (2 Mos Free) + 5 Free Smart Cards (₦35,000 value)',
     features: [
       'Up to 20 Dining Tables',
@@ -106,9 +118,11 @@ export const DEFAULT_PLANS: PlanTier[] = [
     category: 'restaurant',
     badge: 'High Volume',
     monthlyPrice: 21000,
+    sixMonthsPrice: 117000, // save 9,000 (7.1% off)
     annualPrice: 210000,
     maxTables: 60,
     tagline: 'For busy lounges, clubs, rooftop bars & multi-floor dining',
+    sixMonthsIncentive: 'Save ₦9,000 (Small 7% discount · Standard features, no extra perks)',
     annualIncentive: 'Save ₦42,000 (2 Mos Free) + 10 Free Smart Cards (₦70,000 value)',
     features: [
       'Up to 60 Dining Tables',
@@ -126,9 +140,11 @@ export const DEFAULT_PLANS: PlanTier[] = [
     category: 'restaurant',
     badge: 'Unlimited',
     monthlyPrice: 35000,
+    sixMonthsPrice: 195000, // save 15,000 (7.1% off)
     annualPrice: 350000,
     maxTables: null,
     tagline: 'For restaurant chains, hotel dining & large hospitality venues',
+    sixMonthsIncentive: 'Save ₦15,000 (Small 7% discount · Standard features, no extra perks)',
     annualIncentive: 'Save ₦70,000 (2 Mos Free) + 20 Free Smart Cards (₦140,000 value)',
     features: [
       'Unlimited Dining Tables & Bars',
@@ -220,4 +236,26 @@ export function resetPlansToDefault(): PlanTier[] {
   saveStoredPlans(DEFAULT_PLANS);
   saveStoredVendorPlans(DEFAULT_VENDOR_PLANS);
   return DEFAULT_PLANS;
+}
+
+export function getBillingCycleMonths(cycle: BillingCycle): number {
+  if (cycle === 'annual') return 12;
+  if (cycle === 'semi-annual') return 6;
+  return 1;
+}
+
+export function getPlanPriceForCycle(plan: PlanTier, cycle: BillingCycle): number {
+  if (cycle === 'annual') return plan.annualPrice;
+  if (cycle === 'semi-annual') return plan.sixMonthsPrice || Math.round(plan.monthlyPrice * 5.6);
+  return plan.monthlyPrice;
+}
+
+export function findPlanTier(planId: string, isVendor?: boolean): PlanTier | undefined {
+  const normId = (planId || '').toLowerCase();
+  const list = isVendor ? getStoredVendorPlans() : getStoredPlans();
+  const found = list.find(p => p.id === normId);
+  if (found) return found;
+  // Check alternate list if not found
+  const alt = !isVendor ? getStoredVendorPlans() : getStoredPlans();
+  return alt.find(p => p.id === normId) || list[0];
 }
