@@ -193,7 +193,7 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
       lines.push(`"No operating expenses recorded for ${timeframeLabel}"`);
     }
 
-    const csvContent = lines.join('\n');
+    const csvContent = '\uFEFF' + lines.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -203,6 +203,9 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    if (typeof showNotification === 'function') {
+      showNotification('📥 CSV Spreadsheet downloaded successfully!');
+    }
   };
 
   // 2. ACTUAL PRINTABLE / DOWNLOADABLE PDF FINANCIAL LEDGER (NOT an app screenshot)
@@ -393,9 +396,28 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
       padding: 10px 14px;
       background: #f8fafc;
     }
+    @media print {
+      .no-print { display: none !important; }
+      body { padding: 0 !important; }
+    }
   </style>
 </head>
 <body>
+  <!-- Print Control Banner (Hidden in PDF Print) -->
+  <div class="no-print" style="position: sticky; top: 0; z-index: 100; background: #0f172a; color: #fff; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+    <div style="font-size: 13px; font-weight: bold;">
+      📄 ${restaurantName} — Financial & Sales Audit Ledger (${timeframeLabel})
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button onclick="window.print()" style="background: #f59e0b; color: #000; font-weight: bold; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px;">
+        🖨️ Save as PDF / Print
+      </button>
+      <button onclick="window.close()" style="background: #334155; color: #fff; font-weight: 600; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px;">
+        Close
+      </button>
+    </div>
+  </div>
+
   <!-- Header -->
   <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px;">
     <div>
@@ -563,16 +585,27 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
 </html>
     `;
 
-    // Direct download: generate HTML blob and trigger browser download (no print dialog)
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `tapmenu_ledger_${slug}_${timeframeLabel}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+    // Open dedicated printable PDF audit window with instant print trigger
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+        }, 300);
+      };
+      if (typeof showNotification === 'function') {
+        showNotification('📄 Print / Save as PDF window opened!');
+      }
+    } else {
+      // Fallback if popup blocker intercepted
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    }
   };
 
   return (
@@ -691,14 +724,14 @@ export const KitchenArchiveView: React.FC<KitchenArchiveViewProps> = ({
             <span>Export CSV</span>
           </button>
 
-          {/* SEPARATE BUTTON 2: DOWNLOAD LEDGER */}
+          {/* SEPARATE BUTTON 2: DOWNLOAD PDF LEDGER */}
           <button
             onClick={handleExportPdfLedger}
             className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
-            title="Download financial ledger as a file (open in browser and Ctrl+P → Save as PDF)"
+            title="Open official financial audit ledger to Save as PDF or print"
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Download Ledger</span>
+            <Printer className="w-3.5 h-3.5" />
+            <span>Save / Print PDF Ledger</span>
           </button>
         </div>
       </div>

@@ -52,6 +52,8 @@ export const LandingPage: React.FC<{ onOpenPricing?: () => void }> = ({ onOpenPr
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [category, setCategory] = useState<'restaurant' | 'vendor'>('restaurant');
   const [password, setPassword] = useState('');
   const [currency, setCurrency] = useState('₦');
   const [chosenColor] = useState('#0c2e22');
@@ -98,13 +100,18 @@ export const LandingPage: React.FC<{ onOpenPricing?: () => void }> = ({ onOpenPr
     setLoading(true);
 
     try {
+      const isVendor = category === 'vendor';
       const res = await registerRestaurant({
-        name,
-        slug,
-        email,
+        name: name.trim(),
+        slug: slug.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
         password,
         currency,
         coverColor: chosenColor,
+        serviceMode: isVendor ? 'counter_only' : 'table_service',
+        plan: isVendor ? 'vendor' : 'basic',
+        tagline: isVendor ? 'Street Vendor / Stall' : 'Kitchen & Bar',
       });
 
       if (!res.success || !res.restaurant) {
@@ -474,15 +481,73 @@ export const LandingPage: React.FC<{ onOpenPricing?: () => void }> = ({ onOpenPr
             )}
 
             <form onSubmit={handleRegister} className="space-y-3.5">
+              {/* Category Choice: Restaurant vs Food Vendor */}
               <div>
-                <label className="block font-bold text-stone-700 mb-1">Restaurant Name *</label>
+                <label className="block font-bold text-stone-700 mb-1">Business Category *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCategory('restaurant')}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      category === 'restaurant'
+                        ? 'border-amber-600 bg-amber-50/80 ring-2 ring-amber-600/40 text-stone-900 shadow-xs'
+                        : 'border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs mb-0.5">
+                      <span>🍽️</span>
+                      <span>Restaurant / Lounge</span>
+                    </div>
+                    <div className="text-[10px] text-stone-500 leading-snug">
+                      Table QR codes & dine-in orders
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCategory('vendor')}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      category === 'vendor'
+                        ? 'border-amber-600 bg-amber-50/80 ring-2 ring-amber-600/40 text-stone-900 shadow-xs'
+                        : 'border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs mb-0.5">
+                      <span>⚡</span>
+                      <span>Food Vendor</span>
+                    </div>
+                    <div className="text-[10px] text-stone-500 leading-snug">
+                      Counter pickup, walk-ups & delivery
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-stone-700 mb-1">
+                  {category === 'vendor' ? 'Vendor / Brand Name *' : 'Restaurant Name *'}
+                </label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g. The Corner Table"
+                  placeholder={category === 'vendor' ? "e.g. Iya Basira Suya & Grills" : "e.g. The Corner Table"}
                   className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-base sm:text-sm text-stone-900 focus:outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-stone-700 mb-1">
+                  Manager / WhatsApp Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g. 0803 123 4567 or +234..."
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-base sm:text-sm text-stone-900 focus:outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900 transition-colors font-mono"
                 />
               </div>
 
@@ -550,7 +615,7 @@ export const LandingPage: React.FC<{ onOpenPricing?: () => void }> = ({ onOpenPr
                 disabled={loading}
                 className="w-full py-3.5 bg-[#0c2e22] hover:bg-[#124231] text-[#D4AF37] font-bold rounded-xl text-sm transition-all shadow-md active:scale-98 disabled:opacity-50 mt-2 border border-[#D4AF37]/35 cursor-pointer"
               >
-                {loading ? 'Creating Menu Book...' : 'Create My Restaurant Menu →'}
+                {loading ? 'Creating Menu Book...' : category === 'vendor' ? 'Create My Vendor Menu →' : 'Create My Restaurant Menu →'}
               </button>
             </form>
 
