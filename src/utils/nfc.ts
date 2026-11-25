@@ -67,3 +67,25 @@ export async function generateQrDataUrl(url: string, colorDark = '#18181b'): Pro
     return '';
   }
 }
+
+/**
+ * Generates an ultra-crisp, high-resolution QR code data URL (1024x1024)
+ * with High error-correction ('H') for physical printing on table stands,
+ * stickers, and acrylic displays. 100% offline and zero network dependency.
+ */
+export async function generateHighResQrDataUrl(url: string, width = 1024, colorDark = '#111827'): Promise<string> {
+  try {
+    return await QRCode.toDataURL(url, {
+      width,
+      margin: 2,
+      color: {
+        dark: colorDark,
+        light: '#ffffff'
+      },
+      errorCorrectionLevel: 'H'
+    });
+  } catch (err) {
+    console.error('Failed to generate high-resolution QR code', err);
+    return '';
+  }
+}

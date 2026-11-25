@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { sanitizeRestaurantLogo } from '../../utils/logoSanitizer';
 import { setActiveSession, saveStoredRestaurants, fileToDataUrl, saveDishToSupabase, deleteDishFromSupabase, saveShiftToSupabase, syncAllDishesToSupabase, updateRestaurantPlanInSupabase, syncRestaurantMetaToSupabase } from '../../utils/supabase';
-import { generateQrDataUrl } from '../../utils/nfc';
+import { generateQrDataUrl, generateHighResQrDataUrl } from '../../utils/nfc';
+import { getAbsoluteTableUrl, getAbsoluteVendorUrl, getAbsoluteBaseUrl } from '../../utils/canonicalUrl';
 import { getStoredPlans, getStoredVendorPlans, PlanTier } from '../../utils/pricingConfig';
 import { 
   ChefHat, 
@@ -53,7 +54,7 @@ import { KitchenDisplay } from './KitchenDisplay';
 import { OrderSmartCardsModal } from '../Hardware/OrderSmartCardsModal';
 import { MultiStoreManagerModal } from './MultiStoreManagerModal';
 import { getNetworkVerifiedDate, formatNetworkDate, formatNetworkTime } from '../../utils/networkTime';
-import { Package, DollarSign, Store, Lock, ShieldAlert, Zap, ArrowRight } from 'lucide-react';
+import { Package, DollarSign, Store, Lock, ShieldAlert, Zap, ArrowRight, Download } from 'lucide-react';
 
 export const RestaurantDashboard: React.FC = () => {
   const { 
@@ -492,14 +493,14 @@ export const RestaurantDashboard: React.FC = () => {
     return { mins, timeLabel, urgency };
   };
 
-  // Generate QR code for every table
+  // Generate absolute, permanent QR code for every table
   useEffect(() => {
     let mounted = true;
     const generateAllQrs = async () => {
       const map: Record<string, string> = {};
       for (const tbl of activeRestaurant.tables) {
         try {
-          const directUrl = `${origin}/?r=${activeRestaurant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
+          const directUrl = getAbsoluteTableUrl(activeRestaurant.slug, tbl.tableNumber);
           map[tbl.id] = await generateQrDataUrl(directUrl);
         } catch (e) {
           console.warn('QR error for table', tbl.tableNumber, e);
@@ -509,19 +510,35 @@ export const RestaurantDashboard: React.FC = () => {
     };
     generateAllQrs();
     return () => { mounted = false; };
-  }, [activeRestaurant.tables, activeRestaurant.slug, origin]);
+  }, [activeRestaurant.tables, activeRestaurant.slug]);
 
   // Generate Counter QR code for Vendor
   useEffect(() => {
     let mounted = true;
     if (isVendor && activeRestaurant.slug) {
-      const directUrl = `${origin}/?r=${activeRestaurant.slug}`;
+      const directUrl = getAbsoluteVendorUrl(activeRestaurant.slug);
       generateQrDataUrl(directUrl).then(qr => {
         if (mounted) setVendorQrUrl(qr);
       }).catch(console.warn);
     }
     return () => { mounted = false; };
-  }, [isVendor, activeRestaurant.slug, origin]);
+  }, [isVendor, activeRestaurant.slug]);
+
+  const handleDownloadTableQr = async (directUrl: string, tableNumber: string) => {
+    try {
+      const dataUrl = await generateHighResQrDataUrl(directUrl, 1024);
+      if (!dataUrl) return;
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${activeRestaurant.slug}-${tableNumber.replace(/\s+/g, '-').toLowerCase()}-qr.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showNotification(`Downloaded High-Res 1024px QR for ${tableNumber}!`);
+    } catch (e) {
+      console.warn('Download table QR error', e);
+    }
+  };
 
   const handleCopyMenuLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -2000,7 +2017,7 @@ export const RestaurantDashboard: React.FC = () => {
             {/* Tables Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeRestaurant.tables.map(tbl => {
-                const directUrl = `${origin}/?r=${activeRestaurant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
+                const directUrl = getAbsoluteTableUrl(activeRestaurant.slug, tbl.tableNumber);
                 const qrImage = tableQrMap[tbl.id];
 
                 return (
@@ -2036,10 +2053,19 @@ export const RestaurantDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-neutral-100 flex items-center justify-center gap-2">
+                    <div className="pt-2 border-t border-neutral-100 flex items-center justify-center gap-1.5 flex-wrap">
+                      <button
+                        onClick={() => handleDownloadTableQr(directUrl, tbl.tableNumber)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                        title="Download High-Res (1024px) printable QR"
+                      >
+                        <Download className="w-3 h-3 text-neutral-950" />
+                        <span>Download QR</span>
+                      </button>
+
                       <button
                         onClick={() => handleCopyMenuLink(directUrl)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 rounded-lg text-[11px] font-bold text-neutral-700"
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 rounded-lg text-[11px] font-bold text-neutral-700 cursor-pointer"
                       >
                         <Copy className="w-3 h-3" />
                         <span>Copy URL</span>

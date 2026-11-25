@@ -1,4 +1,5 @@
 import { RestaurantTenant, MenuBookDesign, MenuTemplateId } from '../types';
+import { getAbsoluteTableUrl } from '../utils/canonicalUrl';
 
 export const TEMPLATE_PRESETS: Record<MenuTemplateId, { name: string; description: string; previewColor: string; accentColor: string; design: MenuBookDesign }> = {
   emerald_gold: {
@@ -275,7 +276,6 @@ export function createDefaultRestaurantTenant(
     logo?: string;
   }
 ): RestaurantTenant {
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const templateId = options?.templateId || 'emerald_gold';
   const preset = TEMPLATE_PRESETS[templateId] || TEMPLATE_PRESETS.emerald_gold;
   const currency = options?.currency || '₦';
@@ -283,7 +283,7 @@ export function createDefaultRestaurantTenant(
 
   const newId = `rest-${Date.now()}`;
 
-  // Default initial 5 tables for QR / NFC
+  // Default initial 5 tables for QR / NFC with absolute canonical URLs
   const tables = [1, 2, 3, 4, 5].map(num => ({
     id: `tbl-${newId}-${num}`,
     tableNumber: `Table ${num}`,
@@ -293,7 +293,7 @@ export function createDefaultRestaurantTenant(
     nfcStatus: 'active' as const,
     totalTaps: 0,
     totalScans: 0,
-    urlPayload: `${origin}/?r=${slug}&table=Table+${num}`
+    urlPayload: getAbsoluteTableUrl(slug, `Table ${num}`)
   }));
 
   // Initial menu pages: Cover + 1 starter category ready for adding dishes

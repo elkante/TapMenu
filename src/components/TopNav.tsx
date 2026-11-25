@@ -58,7 +58,7 @@ export const TopNav: React.FC<{
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-neutral-200/80 no-print">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-neutral-200/80 no-print pt-[env(safe-area-inset-top,0px)]">
       <div className="max-w-5xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3">
         {/* Zone 1: Restaurant Identity */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">

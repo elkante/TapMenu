@@ -137,7 +137,7 @@ const MainContent: React.FC = () => {
   // ROUTE 3: Customer Menu (e.g. ?r=lagos-bites&table=Table+5)
   // =========================================================================
   return (
-    <div className="min-h-screen bg-neutral-100 flex flex-col font-sans">
+    <div className="min-h-screen min-h-[100dvh] bg-neutral-100 flex flex-col font-sans">
       {/* Toast Notification */}
       {notificationMsg && (
         <div className="fixed bottom-6 right-6 z-50 bg-neutral-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-neutral-700 text-xs font-semibold flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom duration-200">

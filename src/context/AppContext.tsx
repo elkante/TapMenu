@@ -39,6 +39,7 @@ import {
 } from '../utils/supabase';
 import { getStoredPlans } from '../utils/pricingConfig';
 import { getNetworkVerifiedDate, formatNetworkTime } from '../utils/networkTime';
+import { getAbsoluteTableUrl, getAbsoluteVendorUrl, getAbsoluteBaseUrl } from '../utils/canonicalUrl';
 
 export type AppViewMode = 'flipbook' | 'quick_menu' | 'editor' | 'nfc_qr' | 'orders' | 'super_admin';
 
@@ -213,7 +214,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const params = new URLSearchParams(window.location.search);
     const slugParam = params.get('r') || params.get('tenant') || params.get('restaurant');
-    const tableParam = params.get('table');
+    const tableParam = params.get('table') || params.get('t') || params.get('tableId');
     const srcParam = params.get('src');
 
     if (slugParam) {
@@ -255,7 +256,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       if (tableParam) {
-        setCurrentTable(decodeURIComponent(tableParam));
+        const decoded = decodeURIComponent(tableParam.replace(/\+/g, ' ')).trim();
+        let formatted = decoded;
+        if (/^\d+$/.test(decoded)) {
+          formatted = `Table ${parseInt(decoded, 10)}`;
+        }
+        setCurrentTable(formatted);
       }
       // No fallback: only show a table badge when explicitly arriving via a table-specific link
 
@@ -1220,7 +1226,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const newTag: TableNfcTag = {
       id: `tbl-${Date.now()}`,
       tableNumber,
@@ -1230,7 +1235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       nfcStatus: 'active',
       totalTaps: 0,
       totalScans: 0,
-      urlPayload: `${origin}/?r=${activeRestaurant.slug}&table=${encodeURIComponent(tableNumber)}`
+      urlPayload: getAbsoluteTableUrl(activeRestaurant.slug, tableNumber)
     };
 
     let updatedTables: TableNfcTag[] = [];
@@ -1319,7 +1324,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             nfcStatus: 'active' as const,
             totalTaps: 0,
             totalScans: 0,
-            urlPayload: `${origin}/?r=${slug}&table=Table+${num}`
+            urlPayload: getAbsoluteTableUrl(slug, `Table ${num}`)
           };
         });
         updatedTables = [...r.tables, ...newTables];

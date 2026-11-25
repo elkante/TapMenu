@@ -28,6 +28,8 @@ import {
 import { CardOrderRequest } from '../../types';
 import { getStoredCardOrders, updateCardOrderStatus } from '../../utils/cardOrderStorage';
 import { NotchedBottomBar } from '../Navigation/NotchedBottomBar';
+import { getAbsoluteTableUrl, getAbsoluteVendorUrl } from '../../utils/canonicalUrl';
+import { generateQrDataUrl, generateHighResQrDataUrl } from '../../utils/nfc';
 import { 
   ShieldCheck, 
   Building2, 
@@ -81,6 +83,26 @@ async function computeSha256(text: string): Promise<string> {
 const SESSION_TOKEN_KEY = 'tapmenu_admin_session_sig';
 const SESSION_TIME_KEY = 'tapmenu_admin_session_ts';
 const SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes auto-timeout
+
+const LocalQrImage: React.FC<{ url: string; alt: string; className?: string }> = ({ url, alt, className }) => {
+  const [src, setSrc] = useState<string>('');
+  useEffect(() => {
+    let active = true;
+    generateQrDataUrl(url).then(dataUrl => {
+      if (active && dataUrl) setSrc(dataUrl);
+    });
+    return () => { active = false; };
+  }, [url]);
+
+  if (!src) {
+    return (
+      <div className={`flex items-center justify-center bg-neutral-100 animate-pulse ${className || 'w-44 h-44 rounded-lg'}`}>
+        <QrCode className="w-10 h-10 text-neutral-300" />
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} className={className} />;
+};
 const LOCKOUT_KEY = 'tapmenu_admin_lockout_ts';
 const ATTEMPTS_KEY = 'tapmenu_admin_failed_attempts';
 
@@ -355,7 +377,7 @@ export const SuperAdminView: React.FC = () => {
       plan: planId, 
       serviceMode: newServiceMode,
       tableLimit: newTableLimit,
-      design: { ...(item.design || {}), serviceMode: newServiceMode, plan: planId }
+      design: { ...(item.design || {}), serviceMode: newServiceMode, plan: planId } as typeof item.design
     } : item));
     showNotification(`Updated plan to ${planId.toUpperCase()} (${isVendor ? '⚡ Street Vendor' : '🍽️ Restaurant'}) for ${t.name}`);
   };
@@ -2131,25 +2153,22 @@ export const SuperAdminView: React.FC = () => {
       />
       {/* ── Admin QR & Links Popup Modal ── */}
       {qrModalTenant && (() => {
-        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tapmenu.me';
         const isVendorModal = isVendorTenant(qrModalTenant);
-        const primaryMenuUrl = `${origin}/?r=${qrModalTenant.slug}`;
+        const primaryMenuUrl = getAbsoluteVendorUrl(qrModalTenant.slug);
 
         const downloadTableQr = async (url: string, label: string) => {
-          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(url)}`;
           try {
-            const resp = await fetch(qrUrl);
-            const blob = await resp.blob();
-            const blobUrl = URL.createObjectURL(blob);
+            const dataUrl = await generateHighResQrDataUrl(url, 1024);
+            if (!dataUrl) throw new Error('QR generation failed');
             const a = document.createElement('a');
-            a.href = blobUrl;
+            a.href = dataUrl;
             a.download = `${qrModalTenant.slug}-${label.replace(/\s+/g, '-').toLowerCase()}-qr.png`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            showNotification(`QR for ${label} downloaded!`);
-          } catch {
-            window.open(qrUrl, '_blank');
+            showNotification(`QR for ${label} downloaded (High-Res 1024px)!`);
+          } catch (err) {
+            console.error('QR download failed:', err);
           }
         };
 
@@ -2164,7 +2183,7 @@ export const SuperAdminView: React.FC = () => {
               nfcStatus: 'active' as const,
               totalTaps: 0,
               totalScans: 0,
-              urlPayload: `${origin}/?r=${qrModalTenant.slug}&table=Table+${num}`
+              urlPayload: getAbsoluteTableUrl(qrModalTenant.slug, `Table ${num}`)
             }))
           : rawTables;
 
@@ -2216,8 +2235,8 @@ export const SuperAdminView: React.FC = () => {
               {isVendorModal && (
                 <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-2xl border border-neutral-200 shadow-inner">
                   <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">⚡ Single Counter Walk-up QR</span>
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(primaryMenuUrl)}`}
+                  <LocalQrImage
+                    url={primaryMenuUrl}
                     alt="Counter QR"
                     className="w-44 h-44 rounded-lg object-contain"
                   />
@@ -2246,7 +2265,7 @@ export const SuperAdminView: React.FC = () => {
                         onClick={async () => {
                           showNotification(`Starting download for all ${tables.length} tables...`);
                           for (const tbl of tables) {
-                            const tableUrl = `${origin}/?r=${qrModalTenant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
+                            const tableUrl = getAbsoluteTableUrl(qrModalTenant.slug, tbl.tableNumber);
                             await downloadTableQr(tableUrl, tbl.tableNumber);
                             await new Promise(r => setTimeout(r, 400));
                           }
@@ -2265,108 +2284,46 @@ export const SuperAdminView: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      {/* Tab strip for table selection */}
-                      <div className="flex gap-1.5 flex-wrap">
-                        {tables.map((tbl, idx) => (
-                          <button
-                            key={tbl.id}
-                            type="button"
-                            onClick={() => setSelectedTableIdx(idx)}
-                            className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
-                              selectedTableIdx === idx
-                                ? 'bg-amber-500 text-black shadow-md'
-                                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'
-                            }`}
-                          >
-                            {tbl.tableNumber}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Selected table QR */}
-                      {tables[selectedTableIdx] && (() => {
-                        const tbl = tables[selectedTableIdx];
-                        const tableUrl = `${origin}/?r=${qrModalTenant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
-                        const tableQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(tableUrl)}`;
-                        return (
-                          <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-2xl border border-neutral-200 shadow-inner">
-                            <span className="text-[11px] font-extrabold text-neutral-800 uppercase tracking-widest">{tbl.tableNumber}</span>
-                            <img
-                              src={tableQrUrl}
-                              alt={`QR for ${tbl.tableNumber}`}
-                              className="w-48 h-48 rounded-lg object-contain"
-                            />
-                            <span className="text-[10px] text-neutral-500 font-mono break-all text-center max-w-xs">{tableUrl}</span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => downloadTableQr(tableUrl, tbl.tableNumber)}
-                                className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-                              >
-                                <Download className="w-3.5 h-3.5 text-amber-400" />
-                                Download QR (PNG)
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(tableUrl);
-                                  showNotification(`${tbl.tableNumber} link copied!`);
-                                }}
-                                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-amber-300 font-bold rounded-xl text-[11px] cursor-pointer"
-                              >
-                                Copy Link
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* All-tables compact list */}
-                      <div className="space-y-1">
-                        <label className="font-bold text-neutral-500 uppercase tracking-wider text-[10px]">All Table Links</label>
-                        <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                          {tables.map((tbl, idx) => {
-                            const tableUrl = `${origin}/?r=${qrModalTenant.slug}&table=${encodeURIComponent(tbl.tableNumber)}`;
-                            return (
-                              <div
-                                key={tbl.id}
-                                className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-colors ${
-                                  selectedTableIdx === idx
-                                    ? 'bg-amber-500/10 border-amber-500/30'
-                                    : 'bg-neutral-950/60 border-neutral-800 hover:border-neutral-700'
-                                }`}
-                                onClick={() => setSelectedTableIdx(idx)}
-                              >
-                                <span className="font-mono font-bold text-white text-[11px]">{tbl.tableNumber}</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono text-neutral-500 text-[10px] truncate max-w-[140px]">{tableUrl}</span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      downloadTableQr(tableUrl, tbl.tableNumber);
-                                    }}
-                                    className="p-1 text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 rounded transition-colors"
-                                    title={`Download QR for ${tbl.tableNumber}`}
-                                  >
-                                    <Download className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigator.clipboard.writeText(tableUrl);
-                                      showNotification(`${tbl.tableNumber} link copied!`);
-                                    }}
-                                    className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 rounded font-bold text-[10px] cursor-pointer"
-                                  >
-                                    Copy
-                                  </button>
-                                </div>
+                      {/* Full grid: one QR card per table — all visible at once */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {tables.map((tbl) => {
+                          const tableUrl = getAbsoluteTableUrl(qrModalTenant.slug, tbl.tableNumber);
+                          return (
+                            <div
+                              key={tbl.id}
+                              className="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl border border-neutral-200 shadow-sm"
+                            >
+                              <span className="text-[10px] font-extrabold text-neutral-800 uppercase tracking-widest">{tbl.tableNumber}</span>
+                              <LocalQrImage
+                                url={tableUrl}
+                                alt={`QR for ${tbl.tableNumber}`}
+                                className="w-28 h-28 rounded-lg object-contain"
+                              />
+                              <span className="text-[9px] text-neutral-400 font-mono break-all text-center leading-tight">{tableUrl}</span>
+                              <div className="flex items-center gap-1.5 w-full">
+                                <button
+                                  type="button"
+                                  onClick={() => downloadTableQr(tableUrl, tbl.tableNumber)}
+                                  className="flex-1 py-1.5 bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer text-[10px]"
+                                  title={`Download high-res QR for ${tbl.tableNumber}`}
+                                >
+                                  <Download className="w-3 h-3 text-amber-400" />
+                                  PNG
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(tableUrl);
+                                    showNotification(`${tbl.tableNumber} link copied!`);
+                                  }}
+                                  className="flex-1 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 font-bold rounded-lg text-[10px] cursor-pointer"
+                                >
+                                  Copy
+                                </button>
                               </div>
-                            );
-                          })}
-                        </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </>
                   )}

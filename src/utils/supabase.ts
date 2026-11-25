@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { RestaurantTenant, FoodItem, Order, WaiterCall, MenuBookPage } from '../types';
 import { sanitizeRestaurantLogo } from './logoSanitizer';
+import { getAbsoluteBaseUrl, getAbsoluteTableUrl } from './canonicalUrl';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kxszokrflzknhtsicbzm.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_uHLP5_-WK_mZH-fHd_e3AQ_6XhkviZJ';
@@ -256,20 +257,32 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
   }
 
   const designObj = (typeof rRow.design === 'object' && rRow.design !== null) ? rRow.design : {};
+  // Plan is sourced from the dedicated column first (most reliable), then design JSONB, then local cache
   const effectivePlan = ((rRow.plan || designObj.plan || localMatch?.plan || 'basic') as string).toLowerCase();
 
-  const isDineInPlan = effectivePlan.includes('basic') || 
-                       effectivePlan.includes('standard') || 
-                       effectivePlan.includes('premium') || 
-                       effectivePlan.includes('enterprise');
+  // A dine-in plan ALWAYS overrides any service_mode flag — prevents miscategorisation
+  const isDineInPlan = effectivePlan.includes('basic') ||
+                       effectivePlan.includes('standard') ||
+                       effectivePlan.includes('premium') ||
+                       effectivePlan.includes('enterprise') ||
+                       effectivePlan.includes('growth');
 
+  // Only treat as vendor when plan is explicitly vendor-flavoured AND no dine-in plan detected
   const isVendor = !isDineInPlan && (
-    effectivePlan === 'vendor' || 
-    effectivePlan === 'vendor-monthly' || 
-    effectivePlan === 'vendor-pro' || 
-    rRow.service_mode === 'counter_only' || 
+    effectivePlan === 'vendor' ||
+    effectivePlan === 'vendor-monthly' ||
+    effectivePlan === 'vendor-pro' ||
+    rRow.service_mode === 'counter_only' ||
     designObj.serviceMode === 'counter_only'
   );
+
+  // Background auto-heal: if DB has wrong service_mode for a dine-in plan, correct it silently
+  if (isDineInPlan && rRow.service_mode === 'counter_only' && typeof window !== 'undefined' && supabase && rRow.id) {
+    supabase.from('restaurants')
+      .update({ service_mode: 'table_service' })
+      .eq('id', rRow.id)
+      .then(() => {}, () => {});
+  }
 
   // Preserve user-generated tables across logouts & refreshes (Dine-in only)
   let tables: any[] = [];
@@ -305,7 +318,13 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
         nfcStatus: 'active' as const,
         totalTaps: 0,
         totalScans: 0,
-        urlPayload: `${origin}/?r=${rRow.slug}&table=Table+${num}`
+        urlPayload: getAbsoluteTableUrl(rRow.slug, `Table ${num}`)
+      }));
+    } else {
+      // Auto-heal any legacy localhost / incomplete table URLs to absolute canonical URLs
+      tables = tables.map((tbl, idx) => ({
+        ...tbl,
+        urlPayload: getAbsoluteTableUrl(rRow.slug, tbl.tableNumber || `Table ${idx + 1}`)
       }));
     }
   }

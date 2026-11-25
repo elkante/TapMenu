@@ -57,7 +57,7 @@ export const QuickMenuView: React.FC<{ onSelectItem: (item: FoodItem) => void }>
   const soldOutCount = filteredItems.filter(it => it.isSoldOut).length;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-4xl mx-auto px-4 py-6 pb-[calc(env(safe-area-inset-bottom,0px)+2.5rem)]">
       {/* Header Banner */}
       <div className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-sm mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

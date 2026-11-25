@@ -171,13 +171,13 @@ export const FlipbookViewer: React.FC = () => {
 
   return (
     <div 
-      className="min-h-[calc(100vh-3.5rem)] [@supports(min-height:100dvh)]:min-h-[calc(100dvh-3.5rem)] text-neutral-100 flex flex-col justify-between py-2 sm:py-4 px-2 sm:px-6 relative select-none overflow-x-hidden"
+      className="min-h-[calc(100vh-3.5rem)] [@supports(min-height:100dvh)]:min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px))] text-neutral-100 flex flex-col justify-between py-1.5 sm:py-3 px-1.5 sm:px-6 relative select-none overflow-x-hidden"
       style={{
         background: `radial-gradient(ellipse at 50% 30%, ${coverThemeColor}55 0%, #111412 85%, #0a0c0b 100%)`
       }}
     >
       {/* Top Subtle Status Bar */}
-      <div className="max-w-xl mx-auto w-full flex items-center justify-between text-xs px-2 mb-1.5 text-neutral-400 relative z-10">
+      <div className="max-w-xl mx-auto w-full flex items-center justify-between text-xs px-2 mb-1 text-neutral-400 relative z-10">
         <div className="flex items-center gap-2 truncate">
           <span className="font-serif font-bold text-amber-200/90 truncate tracking-wide">
             {currentPage.layout === 'cover' ? activeRestaurant.name : currentPage.title}
@@ -202,7 +202,7 @@ export const FlipbookViewer: React.FC = () => {
 
       {/* Main Authentic Book Spread (Matching The Corner Table & Open Brochure) */}
       <div 
-        className="flex-1 flex items-center justify-center my-auto w-full relative py-1"
+        className="flex-1 flex items-center justify-center my-auto w-full relative py-0.5"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -249,7 +249,7 @@ export const FlipbookViewer: React.FC = () => {
 
             {/* Layered Paper Stack Edge (Bottom & Right) to give true 3D book thickness */}
             <div 
-              className="w-full h-[530px] xs:h-[580px] sm:h-[650px] max-h-[82vh] relative rounded-2xl bg-[#FAF7F2]"
+              className="w-full h-[clamp(360px,calc(100dvh-13.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)),520px)] xs:h-[clamp(380px,calc(100dvh-13.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)),560px)] sm:h-[620px] md:h-[660px] max-h-[calc(100dvh-11rem)] relative rounded-2xl bg-[#FAF7F2]"
               style={{
                 boxShadow: `${Math.min(4, Math.max(1, Math.ceil((pages.length - 1 - currentPageIndex) / 2))) >= 1 ? '2px 2px 0 #ede8db, ' : ''}${Math.min(4, Math.max(1, Math.ceil((pages.length - 1 - currentPageIndex) / 2))) >= 2 ? '4px 4px 0 #e0d9c8, ' : ''}${Math.min(4, Math.max(1, Math.ceil((pages.length - 1 - currentPageIndex) / 2))) >= 3 ? '6px 6px 0 #d5ccb8, ' : ''}${Math.min(4, Math.max(1, Math.ceil((pages.length - 1 - currentPageIndex) / 2))) >= 4 ? '8px 8px 0 #c8bfa7, ' : ''}12px 14px 28px rgba(0,0,0,0.55)`,
                 perspective: '2200px',
@@ -400,7 +400,7 @@ export const FlipbookViewer: React.FC = () => {
       {/* ========================================================================= */}
       {/* FLOATING PILL NAVIGATION BAR (Exact replica of The Corner Table reference!) */}
       {/* ========================================================================= */}
-      <div className="max-w-xl mx-auto w-full px-2 pt-2 pb-1">
+      <div className="max-w-xl mx-auto w-full px-2 pt-1 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] shrink-0 z-30">
         <div className="bg-[#121614]/95 backdrop-blur-md rounded-full py-1.5 px-2.5 sm:px-4 border border-[#D4AF37]/40 flex items-center justify-between gap-1 shadow-2xl text-xs">
           {/* < Prev */}
           <button

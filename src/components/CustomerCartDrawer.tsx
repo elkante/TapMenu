@@ -107,7 +107,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
       <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl relative animate-in slide-in-from-right duration-200">
 
         {/* ── Header ── */}
-        <div className="p-4 border-b border-neutral-200 flex items-center justify-between shrink-0">
+        <div className="p-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] border-b border-neutral-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <ShoppingBag className="w-5 h-5 text-amber-600 shrink-0" />
             <h2 className="text-base font-bold text-neutral-900 truncate">{headerLabel}</h2>
@@ -515,13 +515,15 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                   </p>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold rounded-xl text-sm transition-colors shadow-md flex items-center justify-center gap-2 active:scale-[0.98]"
-                >
-                  <span>Send Order · {design.currencySymbol}{total.toLocaleString()}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                <div className="pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)]">
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold rounded-xl text-sm transition-colors shadow-md flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
+                  >
+                    <span>Send Order · {design.currencySymbol}{total.toLocaleString()}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
               </form>
             )}
           </>
