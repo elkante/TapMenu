@@ -1437,19 +1437,23 @@ export const RestaurantDashboard: React.FC = () => {
             if (dLeft > 5) return null;
             const isExp = dLeft <= 0;
             return (
-              <div className={`mb-4 p-3.5 rounded-2xl shadow-md flex items-center justify-between gap-3 border animate-in fade-in ${
+              <div className={`mb-4 p-4 rounded-2xl shadow-xl flex items-center justify-between gap-3 border-2 animate-in fade-in ${
                 isExp
-                  ? 'bg-red-500/15 border-red-500/30 text-red-300'
-                  : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                  ? 'bg-neutral-950 border-red-500 text-red-200'
+                  : 'bg-neutral-950 border-amber-500 text-amber-200'
               }`}>
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-xl shrink-0">{isExp ? '⛔' : '⚠️'}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${
+                    isExp ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  }`}>
+                    {isExp ? '⛔' : '⚠️'}
+                  </div>
                   <div className="min-w-0 text-xs">
-                    <span className="font-extrabold block text-white">
+                    <span className={`font-black text-sm block tracking-tight ${isExp ? 'text-red-400' : 'text-amber-400'}`}>
                       {isExp ? 'Your Plan Has Expired!' : `Plan Expiring Soon: ${dLeft} Day${dLeft === 1 ? '' : 's'} Remaining!`}
                     </span>
-                    <span className="text-[11px] opacity-90 truncate block">
-                      {isExp ? 'Renew your subscription to prevent services from being paused.' : 'Renew your plan now to avoid interruption to your QR codes & online menu.'}
+                    <span className="text-[11px] text-neutral-300 font-medium truncate block mt-0.5">
+                      {isExp ? 'Renew your subscription to prevent menu access from being paused.' : 'Renew your subscription to keep your table QR codes and online menu active.'}
                     </span>
                   </div>
                 </div>
@@ -1457,8 +1461,8 @@ export const RestaurantDashboard: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => triggerTabChange('plan')}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
-                      isExp ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-amber-500 hover:bg-amber-400 text-neutral-950'
+                    className={`px-3.5 py-2 rounded-xl font-black text-xs transition-transform active:scale-95 cursor-pointer shadow-md ${
+                      isExp ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-amber-400 hover:bg-amber-300 text-neutral-950'
                     }`}
                   >
                     Renew Plan →
@@ -1469,10 +1473,10 @@ export const RestaurantDashboard: React.FC = () => {
                       setExpiryBannerDismissed(true);
                       try { sessionStorage.setItem(`tapmenu_dismiss_expiry_${activeRestaurant.id}`, 'true'); } catch {}
                     }}
-                    className="p-1 text-neutral-400 hover:text-white rounded-lg text-lg leading-none cursor-pointer"
-                    title="Dismiss"
+                    className="p-2 text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-800 transition-colors"
+                    title="Dismiss warning"
                   >
-                    ×
+                    ✕
                   </button>
                 </div>
               </div>
@@ -2558,6 +2562,56 @@ export const RestaurantDashboard: React.FC = () => {
                   onChange={(e) => updateRestaurantMeta({ phone: e.target.value })}
                   className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:border-neutral-900"
                 />
+              </div>
+
+              {/* ── Social Media Review & Follow Links (Shown on Book Cover) ── */}
+              <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between border-b border-neutral-200/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <span className="font-bold text-neutral-900 text-xs">Customer Reviews & Social Links</span>
+                  </div>
+                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">
+                    Shown on Cover
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  Diners can tap "Leave Us a Review" on the 3D book cover to review or tag your restaurant on Instagram or TikTok.
+                </p>
+
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Instagram Profile / Link</label>
+                  <div className="flex items-center bg-white border border-neutral-200 rounded-xl px-3 py-2 text-neutral-500 font-mono text-xs">
+                    <span className="text-neutral-400">instagram.com/</span>
+                    <input
+                      type="text"
+                      placeholder="yourrestaurant"
+                      value={(activeRestaurant.instagramUrl || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '')}
+                      onChange={(e) => {
+                        const raw = e.target.value.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '');
+                        updateRestaurantMeta({ instagramUrl: raw ? `https://instagram.com/${raw}` : '' });
+                      }}
+                      className="w-full bg-transparent text-neutral-900 font-bold focus:outline-none ml-1 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">TikTok Profile / Link</label>
+                  <div className="flex items-center bg-white border border-neutral-200 rounded-xl px-3 py-2 text-neutral-500 font-mono text-xs">
+                    <span className="text-neutral-400">tiktok.com/@</span>
+                    <input
+                      type="text"
+                      placeholder="yourrestaurant"
+                      value={(activeRestaurant.tiktokUrl || '').replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, '').replace(/^@/, '')}
+                      onChange={(e) => {
+                        const raw = e.target.value.trim().replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, '').replace(/^@/, '');
+                        updateRestaurantMeta({ tiktokUrl: raw ? `https://tiktok.com/@${raw}` : '' });
+                      }}
+                      className="w-full bg-transparent text-neutral-900 font-bold focus:outline-none ml-1 text-xs"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* ── Menu Cover Photo ── */}

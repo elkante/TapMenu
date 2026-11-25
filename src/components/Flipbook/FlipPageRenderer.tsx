@@ -46,6 +46,7 @@ interface FlipPageRendererProps {
   coverImage?: string;
   onSelectItem?: (item: FoodItem) => void;
   onAddToCart?: (item: FoodItem, e: React.MouseEvent) => void;
+  onOpenReviews?: () => void;
   pageNumberDisplay?: string | number;
 }
 
@@ -61,6 +62,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
   coverImage,
   onSelectItem,
   onAddToCart,
+  onOpenReviews,
   pageNumberDisplay,
 }) => {
   const coverThemeColor = design.coverColor || design.primaryColor || '#0c2e22';
@@ -225,16 +227,51 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
           </div>
         </div>
 
-        {/* Bottom Prompts: Tap or Swipe to Open */}
-        <div className="relative z-10 text-center pb-8 sm:pb-10 px-6">
-          <div 
-            className="text-[11px] sm:text-xs font-bold tracking-[0.25em] uppercase flex items-center justify-center gap-2 drop-shadow"
-            style={{ color: design.coverTextColor || '#D4AF37' }}
-          >
-            <span>TAP OR SWIPE TO OPEN</span>
+        {/* Bottom Prompts: SWIPE TO OPEN + Leave Review */}
+        <div className="relative z-10 text-center pb-6 sm:pb-8 px-6 space-y-3">
+          {/* Main Call To Action: SWIPE TO OPEN with animated directional arrow indicator */}
+          <div className="flex flex-col items-center justify-center gap-1.5">
+            <div 
+              className="text-sm xs:text-base sm:text-lg font-black tracking-[0.22em] uppercase flex items-center justify-center gap-2 drop-shadow-md select-none"
+              style={{ color: design.coverTextColor || '#D4AF37' }}
+            >
+              <span>SWIPE TO OPEN</span>
+              <span className="inline-block animate-pulse text-lg xs:text-xl font-bold">➔</span>
+            </div>
+
+            {/* Visual Directional Indicator Slide Pill */}
+            <div 
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-current/30 text-[10px] font-bold tracking-wider uppercase opacity-85 shadow-xs"
+              style={{ color: design.coverTextColor || '#D4AF37' }}
+            >
+              <span>Slide Left</span>
+              <span className="animate-bounce inline-block text-xs font-black">←</span>
+            </div>
           </div>
+
+          {/* Leave Us a Review Button */}
+          {onOpenReviews && (
+            <div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenReviews();
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full backdrop-blur-md bg-black/40 hover:bg-black/60 border text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+                style={{
+                  borderColor: design.coverTextColor ? `${design.coverTextColor}70` : '#D4AF37',
+                  color: design.coverTextColor || '#FFF5C0'
+                }}
+              >
+                <span>⭐ Leave Us a Review</span>
+                <span className="opacity-75 text-[10px] font-normal">(IG / TikTok)</span>
+              </button>
+            </div>
+          )}
+
           {restaurantHours && (
-            <p className="text-[10px] text-amber-200/60 mt-1.5 font-medium truncate max-w-xs mx-auto">
+            <p className="text-[10px] text-amber-200/60 font-medium truncate max-w-xs mx-auto pt-0.5">
               {restaurantHours}
             </p>
           )}

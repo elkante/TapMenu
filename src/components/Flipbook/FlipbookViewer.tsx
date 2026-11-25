@@ -33,6 +33,7 @@ export const FlipbookViewer: React.FC = () => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [contentsOpen, setContentsOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
   const [itemQuantity, setItemQuantity] = useState(1);
   const [itemNotes, setItemNotes] = useState('');
@@ -283,6 +284,7 @@ export const FlipbookViewer: React.FC = () => {
                     restaurantAddress={activeRestaurant?.address}
                     isCover={currentPageIndex === 0 || currentPage.layout === 'cover'}
                     coverImage={activeRestaurant?.coverImage || currentPage.backgroundImage}
+                    onOpenReviews={() => setIsReviewModalOpen(true)}
                     onSelectItem={(it) => {
                       if (!it.isSoldOut) setSelectedItem(it);
                     }}
@@ -522,6 +524,121 @@ export const FlipbookViewer: React.FC = () => {
           setSelectedItem(null);
         }}
       />
+
+      {/* Social Media Review Popup */}
+      {isReviewModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setIsReviewModalOpen(false)}
+        >
+          <div 
+            className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="text-left">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold">
+                  Diner Feedback
+                </span>
+                <h3 className="text-lg font-black text-white mt-0.5">
+                  Leave Us a Review ⭐
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReviewModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-400 text-left leading-relaxed">
+              We hope you love dining at <strong className="text-white">{activeRestaurant?.name || 'our kitchen'}</strong>! Tap your preferred platform below to leave a review, tag us in your food photos, or post a TikTok video:
+            </p>
+
+            {/* Social Platform Action Buttons */}
+            <div className="space-y-2.5 pt-1">
+              {/* Instagram */}
+              {(() => {
+                const igUrl = (activeRestaurant as any)?.instagramUrl || 
+                  ((activeRestaurant?.design as any)?.instagramUrl) || 
+                  `https://instagram.com/${(activeRestaurant?.slug || 'restaurant').replace(/[^a-z0-9_.]/g, '')}`;
+                const cleanIg = igUrl.startsWith('http') ? igUrl : `https://${igUrl}`;
+
+                return (
+                  <a
+                    href={cleanIg}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-[#833ab4]/20 via-[#fd1d1d]/20 to-[#fcb045]/20 hover:from-[#833ab4]/30 hover:via-[#fd1d1d]/30 hover:to-[#fcb045]/30 border border-[#fd1d1d]/40 transition-all text-left group shadow-sm active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#fd1d1d] to-[#833ab4] flex items-center justify-center text-white text-lg shadow-sm">
+                        📸
+                      </div>
+                      <div>
+                        <div className="font-extrabold text-sm text-white group-hover:text-amber-300 transition-colors">
+                          Review on Instagram
+                        </div>
+                        <div className="text-[10px] text-neutral-400">
+                          Tag us in food stories & reels
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-amber-400 group-hover:translate-x-0.5 transition-transform">
+                      →
+                    </span>
+                  </a>
+                );
+              })()}
+
+              {/* TikTok */}
+              {(() => {
+                const ttUrl = (activeRestaurant as any)?.tiktokUrl || 
+                  ((activeRestaurant?.design as any)?.tiktokUrl) || 
+                  `https://tiktok.com/@${(activeRestaurant?.slug || 'restaurant').replace(/[^a-z0-9_.]/g, '')}`;
+                const cleanTt = ttUrl.startsWith('http') ? ttUrl : `https://${ttUrl}`;
+
+                return (
+                  <a
+                    href={cleanTt}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-3.5 rounded-2xl bg-neutral-850 hover:bg-neutral-800 border border-neutral-700/80 transition-all text-left group shadow-sm active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-black border border-neutral-700 flex items-center justify-center text-white text-lg shadow-[0_0_12px_rgba(37,244,238,0.3)]">
+                        🎵
+                      </div>
+                      <div>
+                        <div className="font-extrabold text-sm text-white group-hover:text-amber-300 transition-colors">
+                          Review on TikTok
+                        </div>
+                        <div className="text-[10px] text-neutral-400">
+                          Tag us in food review videos
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-amber-400 group-hover:translate-x-0.5 transition-transform">
+                      →
+                    </span>
+                  </a>
+                );
+              })()}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsReviewModalOpen(false)}
+              className="w-full py-2.5 text-xs text-neutral-400 hover:text-white rounded-xl transition-colors font-medium mt-2"
+            >
+              Back to Menu
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

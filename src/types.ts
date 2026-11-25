@@ -160,6 +160,9 @@ export interface RestaurantTenant {
   /** CAC Registration Certificate (Optional upload for basic/pro verification) */
   cacCertificateUrl?: string;
   cacStatus?: 'none' | 'pending' | 'verified' | 'rejected';
+  /** Social Reviews & Follow Links (Instagram, TikTok) */
+  instagramUrl?: string;
+  tiktokUrl?: string;
 }
 
 export interface CartItem {
