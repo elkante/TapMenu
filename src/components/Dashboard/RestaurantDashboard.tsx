@@ -86,6 +86,13 @@ export const RestaurantDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'kds' | 'menu' | 'inventory' | 'expenses' | 'archive' | 'tables' | 'settings' | 'plan'>('kds');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [switchingPlan, setSwitchingPlan] = useState<string | null>(null);
+  const [expiryBannerDismissed, setExpiryBannerDismissed] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(`tapmenu_dismiss_expiry_${activeRestaurant?.id}`) === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const handleSwitchPlan = async (newPlanId: string) => {
     if (!activeRestaurant.id) return;
@@ -1226,6 +1233,75 @@ export const RestaurantDashboard: React.FC = () => {
 
         {/* Main Body */}
         <main className="flex-1 min-w-0 p-4 sm:p-6 pb-28 md:pb-8 overflow-y-auto">
+          {/* Services Paused Notification Banner */}
+          {activeRestaurant.status === 'suspended' && (
+            <div className="mb-4 p-4 bg-red-600 text-white rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⛔</span>
+                <div>
+                  <span className="font-extrabold text-sm block">Online Menu & Ordering Services Paused</span>
+                  <span className="text-xs text-red-100">
+                    Your restaurant services are currently paused by administration or awaiting plan renewal. Customers cannot view menus or place orders.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('plan')}
+                className="px-4 py-2 bg-white text-red-700 font-bold text-xs rounded-xl hover:bg-red-50 shrink-0 shadow-sm cursor-pointer"
+              >
+                Renew Plan →
+              </button>
+            </div>
+          )}
+
+          {/* 5-Day Expiry Warning Banner */}
+          {activeRestaurant.status !== 'suspended' && !expiryBannerDismissed && activeRestaurant.subscriptionExpiresAt && (() => {
+            const dLeft = Math.ceil((new Date(activeRestaurant.subscriptionExpiresAt).getTime() - Date.now()) / 86400000);
+            if (dLeft > 5) return null;
+            const isExp = dLeft <= 0;
+            return (
+              <div className={`mb-4 p-3.5 rounded-2xl shadow-md flex items-center justify-between gap-3 border animate-in fade-in ${
+                isExp
+                  ? 'bg-red-500/15 border-red-500/30 text-red-300'
+                  : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+              }`}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-xl shrink-0">{isExp ? '⛔' : '⚠️'}</span>
+                  <div className="min-w-0 text-xs">
+                    <span className="font-extrabold block text-white">
+                      {isExp ? 'Your Plan Has Expired!' : `Plan Expiring Soon: ${dLeft} Day${dLeft === 1 ? '' : 's'} Remaining!`}
+                    </span>
+                    <span className="text-[11px] opacity-90 truncate block">
+                      {isExp ? 'Renew your subscription to prevent services from being paused.' : 'Renew your plan now to avoid interruption to your QR codes & online menu.'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('plan')}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
+                      isExp ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-amber-500 hover:bg-amber-400 text-neutral-950'
+                    }`}
+                  >
+                    Renew Plan →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpiryBannerDismissed(true);
+                      try { sessionStorage.setItem(`tapmenu_dismiss_expiry_${activeRestaurant.id}`, 'true'); } catch {}
+                    }}
+                    className="p-1 text-neutral-400 hover:text-white rounded-lg text-lg leading-none cursor-pointer"
+                    title="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         {/* ========================================================= */}
         {/* TAB 1: KITCHEN DISPLAY SYSTEM (KDS) */}
         {/* ========================================================= */}
@@ -2636,6 +2712,94 @@ export const RestaurantDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Plan Timer / Subscription Expiry Countdown Card */}
+              {(() => {
+                const expiresAt = activeRestaurant.subscriptionExpiresAt;
+                const expiryDate = expiresAt ? new Date(expiresAt) : new Date(Date.now() + 30 * 86400000);
+                const msLeft = expiryDate.getTime() - Date.now();
+                const daysLeft = Math.ceil(msLeft / 86400000);
+                const totalCycleDays = 30;
+                const percentRemaining = Math.max(0, Math.min(100, Math.round((daysLeft / totalCycleDays) * 100)));
+                const isExpired = daysLeft <= 0;
+                const isCritical = daysLeft > 0 && daysLeft <= 5;
+                const isWarning = daysLeft > 5 && daysLeft <= 14;
+
+                return (
+                  <div className={`p-5 rounded-3xl border shadow-lg space-y-4 transition-all ${
+                    isExpired 
+                      ? 'bg-red-500/10 border-red-500/30 text-white'
+                      : isCritical
+                      ? 'bg-orange-500/10 border-orange-500/30 text-white'
+                      : isWarning
+                      ? 'bg-amber-500/10 border-amber-500/30 text-white'
+                      : 'bg-neutral-900 border-neutral-800 text-white'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Clock className={`w-4 h-4 ${
+                            isExpired ? 'text-red-400' : isCritical ? 'text-orange-400' : isWarning ? 'text-amber-400' : 'text-emerald-400'
+                          }`} />
+                          <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                            Subscription Timer & Billing Cycle
+                          </span>
+                        </div>
+                        <h3 className="text-xl sm:text-2xl font-black tracking-tight">
+                          {isExpired ? 'Plan Expired' : `${daysLeft} Day${daysLeft === 1 ? '' : 's'} Remaining`}
+                        </h3>
+                        <p className="text-xs text-neutral-400">
+                          {isExpired 
+                            ? 'Your subscription period has ended. Online ordering services are paused.'
+                            : `Expires on ${expiryDate.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}.`}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`https://wa.me/2348000000000?text=Hi%20TapMenu%20Support!%20I%20would%20like%20to%20renew%20the%20${encodeURIComponent(currentPlanName)}%20plan%20for%20my%20restaurant%20(${encodeURIComponent(activeRestaurant.name)}).`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer ${
+                            isExpired || isCritical
+                              ? 'bg-red-600 hover:bg-red-500 text-white'
+                              : 'bg-amber-500 hover:bg-amber-400 text-neutral-950'
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>{isExpired ? 'Renew Plan Now' : 'Extend / Renew Subscription'}</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Timer Progress Bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-neutral-400">Time left in current cycle</span>
+                        <span className={`font-bold ${
+                          isExpired ? 'text-red-400' : isCritical ? 'text-orange-400' : isWarning ? 'text-amber-400' : 'text-emerald-400'
+                        }`}>
+                          {isExpired ? '0% Remaining' : `${percentRemaining}% (${daysLeft}d left)`}
+                        </span>
+                      </div>
+                      <div className="w-full bg-neutral-800 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isExpired 
+                              ? 'bg-red-500' 
+                              : isCritical 
+                              ? 'bg-orange-500' 
+                              : isWarning 
+                              ? 'bg-amber-500' 
+                              : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${percentRemaining}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Plan Switcher & Category Filter */}
               <div className="space-y-4">

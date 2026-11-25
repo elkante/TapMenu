@@ -397,13 +397,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (ownerSession.restaurantId && r.id === ownerSession.restaurantId) ||
         (ownerSession.restaurantSlug && r.slug.toLowerCase() === ownerSession.restaurantSlug.toLowerCase())
       );
-      if (owned) chosen = owned;
+      if (owned) {
+        chosen = owned;
+      } else if (restaurants.length > 0) {
+        // The restaurant belonging to this session was deleted from Supabase!
+        // Clear the invalid session immediately so it doesn't fall back to another restaurant!
+        setTimeout(() => {
+          saveActiveSession(null);
+          setOwnerSessionState(null);
+        }, 0);
+      }
     }
-    if (!chosen && activeRestaurantId) {
+    if (!chosen && !ownerSession && activeRestaurantId) {
       const found = restaurants.find(r => r.id === activeRestaurantId);
       if (found) chosen = found;
     }
-    if (!chosen) chosen = restaurants[0] || EMPTY_RESTAURANT;
+    if (!chosen) chosen = (ownerSession ? EMPTY_RESTAURANT : (restaurants[0] || EMPTY_RESTAURANT));
 
     return {
       ...chosen,

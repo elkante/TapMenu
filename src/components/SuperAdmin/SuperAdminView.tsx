@@ -61,7 +61,9 @@ import {
   AlertCircle,
   QrCode,
   X,
-  Zap
+  Zap,
+  Pause,
+  Play
 } from 'lucide-react';
 
 // Cryptographic Salt & Precomputed SHA-256 Hashes
@@ -1041,6 +1043,35 @@ export const SuperAdminView: React.FC = () => {
                                   )}
                                 </div>
                               )}
+
+                              {/* Plan Expiry Date & Timer */}
+                              <div className="pt-1.5 border-t border-neutral-800/80 flex flex-col gap-1">
+                                <div className="flex items-center justify-between text-[10px] text-neutral-400">
+                                  <span>Plan Expiry:</span>
+                                  {t.subscriptionExpiresAt && (() => {
+                                    const dLeft = Math.ceil((new Date(t.subscriptionExpiresAt).getTime() - Date.now()) / 86400000);
+                                    return (
+                                      <span className={`font-bold ${
+                                        dLeft <= 0 ? 'text-red-400' : dLeft <= 5 ? 'text-orange-400' : 'text-emerald-400'
+                                      }`}>
+                                        {dLeft <= 0 ? '⛔ Expired' : dLeft <= 5 ? `⚠️ ${dLeft}d left` : `✅ ${dLeft}d left`}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                                <input
+                                  type="date"
+                                  value={t.subscriptionExpiresAt ? t.subscriptionExpiresAt.slice(0, 10) : ''}
+                                  onChange={async (e) => {
+                                    const val = e.target.value ? new Date(e.target.value).toISOString() : undefined;
+                                    await syncRestaurantMetaToSupabase(t.id, { subscriptionExpiresAt: val });
+                                    setTenants(prev => prev.map(item => item.id === t.id ? { ...item, subscriptionExpiresAt: val } : item));
+                                    showNotification(`Updated plan expiry for ${t.name}`);
+                                  }}
+                                  className="w-full px-2 py-0.5 bg-neutral-950 border border-neutral-750 rounded text-amber-300 font-mono text-[10px] focus:outline-none focus:border-amber-400 cursor-pointer"
+                                  title="Edit plan expiry date"
+                                />
+                              </div>
                             </div>
                           </td>
 
@@ -1095,6 +1126,22 @@ export const SuperAdminView: React.FC = () => {
 
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleToggleStatus(t.id, t.status)}
+                                className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] transition-colors flex items-center gap-1 cursor-pointer ${
+                                  t.status === 'suspended'
+                                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                    : 'bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30'
+                                }`}
+                                title={t.status === 'suspended' ? 'Resume services' : 'Pause/suspend services'}
+                              >
+                                {t.status === 'suspended' ? (
+                                  <><Play className="w-3 h-3" /> Resume</>
+                                ) : (
+                                  <><Pause className="w-3 h-3" /> Pause</>
+                                )}
+                              </button>
+
                               <button
                                 onClick={() => {
                                   setQrModalTenant(t);
@@ -1285,10 +1332,51 @@ export const SuperAdminView: React.FC = () => {
                           <span>Single Counter Mode &middot; Dine-in table limits disabled</span>
                         </div>
                       )}
+
+                      {/* Plan Expiry */}
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-neutral-800">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">Expires</label>
+                          {t.subscriptionExpiresAt && (() => {
+                            const dLeft = Math.ceil((new Date(t.subscriptionExpiresAt).getTime() - Date.now()) / 86400000);
+                            return (
+                              <span className={`text-[9px] font-bold ${
+                                dLeft <= 0 ? 'text-red-400' : dLeft <= 5 ? 'text-orange-400' : 'text-emerald-400'
+                              }`}>
+                                ({dLeft <= 0 ? 'Expired' : `${dLeft}d left`})
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <input
+                          type="date"
+                          value={t.subscriptionExpiresAt ? t.subscriptionExpiresAt.slice(0, 10) : ''}
+                          onChange={async (e) => {
+                            const val = e.target.value ? new Date(e.target.value).toISOString() : undefined;
+                            await syncRestaurantMetaToSupabase(t.id, { subscriptionExpiresAt: val });
+                            setTenants(prev => prev.map(item => item.id === t.id ? { ...item, subscriptionExpiresAt: val } : item));
+                            showNotification(`Updated plan expiry for ${t.name}`);
+                          }}
+                          className="px-2 py-0.5 bg-neutral-900 border border-neutral-700 rounded text-amber-300 font-mono text-xs focus:outline-none focus:border-amber-400 cursor-pointer"
+                        />
+                      </div>
                     </div>
 
                     {/* Card Actions */}
                     <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => handleToggleStatus(t.id, t.status)}
+                        className={`py-2 px-2.5 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer ${
+                          t.status === 'suspended'
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                            : 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                        }`}
+                        title={t.status === 'suspended' ? 'Resume services' : 'Pause services'}
+                      >
+                        {t.status === 'suspended' ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                        <span>{t.status === 'suspended' ? 'Resume' : 'Pause'}</span>
+                      </button>
+
                       <button
                         onClick={() => {
                           setQrModalTenant(t);

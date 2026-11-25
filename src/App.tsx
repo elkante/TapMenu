@@ -136,6 +136,28 @@ const MainContent: React.FC = () => {
   // =========================================================================
   // ROUTE 3: Customer Menu (e.g. ?r=lagos-bites&table=Table+5)
   // =========================================================================
+  if (activeRestaurant.status === 'suspended') {
+    return (
+      <div className="min-h-screen min-h-[100dvh] bg-neutral-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="max-w-sm w-full bg-neutral-900 border border-neutral-800 rounded-3xl p-8 shadow-2xl space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center mx-auto text-2xl font-bold">
+            ⏸️
+          </div>
+          <h2 className="text-xl font-extrabold text-white tracking-tight">{activeRestaurant.name}</h2>
+          <div className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30">
+            Services Temporarily Paused
+          </div>
+          <p className="text-xs text-neutral-400 leading-relaxed">
+            Online ordering and digital menu services for this venue are currently paused by administration or awaiting subscription renewal.
+          </p>
+          <div className="pt-2 text-[11px] text-neutral-500 border-t border-neutral-800/80">
+            Please ask staff at the counter for assistance.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen min-h-[100dvh] bg-neutral-100 flex flex-col font-sans">
       {/* Toast Notification */}

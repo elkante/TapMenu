@@ -261,12 +261,19 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
   const effectivePlan = ((rRow.plan || designObj.plan || localMatch?.plan || 'basic') as string).toLowerCase();
   const rawServiceMode = rRow.service_mode || designObj.serviceMode || localMatch?.serviceMode;
 
-  // Service mode from sign-up (counter_only) or vendor plan strictly determines vendor account
-  const isVendor =
+  const isDineInPlan = effectivePlan.includes('basic') ||
+                       effectivePlan.includes('standard') ||
+                       effectivePlan.includes('premium') ||
+                       effectivePlan.includes('enterprise') ||
+                       effectivePlan.includes('growth');
+
+  // Dine-in plans are ALWAYS restaurant; otherwise check vendor plan or counter_only service mode
+  const isVendor = !isDineInPlan && (
     rawServiceMode === 'counter_only' ||
     effectivePlan === 'vendor' ||
     effectivePlan === 'vendor-monthly' ||
-    effectivePlan === 'vendor-pro';
+    effectivePlan === 'vendor-pro'
+  );
 
   // Background auto-heal: if DB has wrong service_mode for a dine-in plan, correct it silently
   if (isDineInPlan && rRow.service_mode === 'counter_only' && typeof window !== 'undefined' && supabase && rRow.id) {
@@ -545,6 +552,8 @@ export async function registerRestaurant(data: {
     plan: initialPlan,
     table_limit: initialTableLimit,
     service_mode: initialServiceMode,
+    phone: data.phone?.trim() || '',
+    subscription_expires_at: defaultExpiresAt,
   }, []);
 
   // Save to local cache (new restaurant first)
@@ -656,36 +665,28 @@ export async function loginRestaurantOwner(
         rRow = data;
       }
 
-      // Check local cache if not found in Supabase
+      // If restaurant not found in Supabase
       if (!rRow) {
+        // If Supabase Auth session was started, immediately sign out to purge zombie auth
+        if (supabase) {
+          try { await supabase.auth.signOut(); } catch {}
+        }
+        setActiveSession(null);
+
+        // Purge any matching stale restaurant from local storage as well
         const stored = getStoredRestaurants();
-        const localMatch = stored.find(r => 
+        const filtered = stored.filter(r => 
           (r.ownerEmail && r.ownerEmail.toLowerCase() === cleanQuery) ||
           r.slug.toLowerCase() === cleanQuery ||
-          r.id === cleanQuery ||
-          r.name.toLowerCase() === cleanQuery
+          r.id === cleanQuery
         );
-        if (localMatch) {
-          const sess: OwnerSession = {
-            userId: authUserId || `user-${localMatch.id}`,
-            email: cleanQuery,
-            restaurantId: localMatch.id,
-            restaurantSlug: localMatch.slug,
-          };
-          setActiveSession(sess);
-          return { success: true, session: sess, restaurant: localMatch };
+        if (filtered.length < stored.length) {
+          saveStoredRestaurants(stored.filter(r => !filtered.some(f => f.id === r.id)));
         }
 
         return { 
           success: false, 
-          error: `No restaurant or vendor found matching "${emailOrSlug}". Please check the spelling or sign up.` 
-        };
-      }
-
-      if (rRow.status === 'suspended') {
-        return { 
-          success: false, 
-          error: 'This account has been temporarily suspended by platform administration.' 
+          error: `This account was deleted or not found. Please register a new account.` 
         };
       }
 
@@ -1351,6 +1352,7 @@ export async function syncRestaurantMetaToSupabase(
     if (meta.packagingFeePerPack !== undefined) updatePayload.packaging_fee = meta.packagingFeePerPack;
     if (meta.deliveryFee !== undefined) updatePayload.delivery_fee = meta.deliveryFee;
     if (meta.serviceMode !== undefined) updatePayload.service_mode = meta.serviceMode;
+    if (meta.subscriptionExpiresAt !== undefined) updatePayload.subscription_expires_at = meta.subscriptionExpiresAt || null;
 
     // Fetch existing row to merge design & settings cleanly
     let existingDesign: Record<string, any> = {};
@@ -1376,6 +1378,7 @@ export async function syncRestaurantMetaToSupabase(
       ...(meta.cacStatus !== undefined ? { cacStatus: meta.cacStatus } : {}),
       ...(meta.packagingFeePerPack !== undefined ? { packagingFeePerPack: meta.packagingFeePerPack } : {}),
       ...(meta.deliveryFee !== undefined ? { deliveryFee: meta.deliveryFee } : {}),
+      ...(meta.subscriptionExpiresAt !== undefined ? { subscriptionExpiresAt: meta.subscriptionExpiresAt } : {}),
     };
 
     updatePayload.design = mergedDesign;
@@ -1559,12 +1562,28 @@ export async function deleteRestaurantFromSupabase(restaurantId: string): Promis
       } catch {}
       await supabase.from('restaurants').delete().eq('id', restaurantId);
 
-      // Attempt to purge auth user record
-      if (ownerId && (supabase.auth as any).admin) {
+      // Attempt to purge auth user record from auth.users
+      if (ownerId) {
+        // Try admin_delete_user RPC first (Security Definer Postgres function)
         try {
-          await (supabase.auth as any).admin.deleteUser(ownerId);
+          await supabase.rpc('admin_delete_user', { target_user_id: ownerId });
         } catch {}
+
+        // Fallback to supabase.auth.admin if service role key available
+        if ((supabase.auth as any).admin?.deleteUser) {
+          try {
+            await (supabase.auth as any).admin.deleteUser(ownerId);
+          } catch {}
+        }
       }
+
+      // If current browser session belongs to this deleted restaurant, sign out immediately
+      try {
+        const { data: userSess } = await supabase.auth.getUser();
+        if (userSess?.user?.id === ownerId) {
+          await supabase.auth.signOut();
+        }
+      } catch {}
     } catch (e) {
       console.warn('Delete restaurant from Supabase error:', e);
     }
