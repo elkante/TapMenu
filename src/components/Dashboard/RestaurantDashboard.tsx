@@ -85,6 +85,146 @@ export const RestaurantDashboard: React.FC = () => {
     rawPlan.includes('vendor');
 
   const [activeTab, setActiveTab] = useState<'kds' | 'menu' | 'inventory' | 'expenses' | 'archive' | 'tables' | 'settings' | 'plan' | 'crm'>('kds');
+
+  // ── PIN Lock System ──────────────────────────────────────────────────────────
+  const PIN_STORAGE_KEY = `tapmenu_pin_${activeRestaurant?.id}`;
+  const PIN_SESSION_KEY = `tapmenu_pin_unlocked_${activeRestaurant?.id}`;
+  /** Tabs that require PIN to access */
+  const LOCKED_TABS = new Set(['settings', 'plan', 'tables', 'archive']);
+
+  const getStoredPin = (): string | null => {
+    try { return localStorage.getItem(PIN_STORAGE_KEY); } catch { return null; }
+  };
+  const isPinSessionUnlocked = (): boolean => {
+    try { return sessionStorage.getItem(PIN_SESSION_KEY) === 'true'; } catch { return false; }
+  };
+  const setPinSessionUnlocked = () => {
+    try { sessionStorage.setItem(PIN_SESSION_KEY, 'true'); } catch {}
+  };
+
+  const [pinModalState, setPinModalState] = useState<{
+    open: boolean;
+    targetTab: typeof activeTab | null;
+    mode: 'unlock' | 'set' | 'change';
+    step: 'enter' | 'confirm';
+    enteredPin: string;
+    newPin: string;
+    error: string;
+    shaking: boolean;
+  }>({
+    open: false,
+    targetTab: null,
+    mode: 'unlock',
+    step: 'enter',
+    enteredPin: '',
+    newPin: '',
+    error: '',
+    shaking: false
+  });
+
+  const triggerTabChange = (tab: typeof activeTab) => {
+    const pinSet = getStoredPin();
+    if (LOCKED_TABS.has(tab) && pinSet && !isPinSessionUnlocked()) {
+      setPinModalState(s => ({ ...s, open: true, targetTab: tab, mode: 'unlock', step: 'enter', enteredPin: '', error: '', shaking: false }));
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
+  const handlePinDigit = (digit: string) => {
+    setPinModalState(s => {
+      const field = s.mode === 'unlock' ? 'enteredPin' : (s.step === 'enter' ? 'newPin' : 'enteredPin');
+      const current = s[field];
+      if (current.length >= 4) return s;
+      const next = current + digit;
+      const updated = { ...s, [field]: next, error: '' };
+      if (next.length === 4) {
+        // Auto-submit
+        setTimeout(() => handlePinSubmit(updated), 80);
+      }
+      return updated;
+    });
+  };
+
+  const handlePinSubmit = (state = pinModalState) => {
+    const storedPin = getStoredPin();
+
+    if (state.mode === 'unlock') {
+      if (state.enteredPin === storedPin) {
+        setPinSessionUnlocked();
+        setPinModalState(s => ({ ...s, open: false }));
+        if (state.targetTab) setActiveTab(state.targetTab);
+      } else {
+        setPinModalState(s => ({ ...s, error: 'Wrong PIN. Try again.', enteredPin: '', shaking: true }));
+        setTimeout(() => setPinModalState(s => ({ ...s, shaking: false })), 500);
+      }
+      return;
+    }
+
+    if (state.mode === 'set' || state.mode === 'change') {
+      if (state.step === 'enter') {
+        if (state.newPin.length < 4) return;
+        setPinModalState(s => ({ ...s, step: 'confirm', enteredPin: '', error: '' }));
+        return;
+      }
+      // confirm step
+      if (state.enteredPin === state.newPin) {
+        try { localStorage.setItem(PIN_STORAGE_KEY, state.newPin); } catch {}
+        setPinSessionUnlocked();
+        setPinModalState(s => ({ ...s, open: false }));
+        showNotification('🔐 Staff PIN set! Locked tabs are now protected.');
+      } else {
+        setPinModalState(s => ({ ...s, error: 'PINs do not match. Start again.', newPin: '', enteredPin: '', step: 'enter', shaking: true }));
+        setTimeout(() => setPinModalState(s => ({ ...s, shaking: false })), 500);
+      }
+    }
+  };
+
+  const handlePinBackspace = () => {
+    setPinModalState(s => {
+      const field = s.mode === 'unlock' ? 'enteredPin' : (s.step === 'enter' ? 'newPin' : 'enteredPin');
+      return { ...s, [field]: s[field].slice(0, -1), error: '' };
+    });
+  };
+
+  const openSetPinModal = () => {
+    const pinSet = getStoredPin();
+    setPinModalState(s => ({
+      ...s,
+      open: true,
+      targetTab: null,
+      mode: pinSet ? 'change' : 'set',
+      step: 'enter',
+      enteredPin: '',
+      newPin: '',
+      error: '',
+      shaking: false
+    }));
+  };
+
+  const lockSession = () => {
+    try { sessionStorage.removeItem(PIN_SESSION_KEY); } catch {}
+    setActiveTab('kds');
+    showNotification('🔒 Portal locked. PIN required to access restricted tabs.');
+  };
+
+  useEffect(() => {
+    if (!pinModalState.open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key >= '0' && e.key <= '9') {
+        handlePinDigit(e.key);
+      } else if (e.key === 'Backspace') {
+        handlePinBackspace();
+      } else if (e.key === 'Escape') {
+        setPinModalState(s => ({ ...s, open: false }));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pinModalState.open, pinModalState.mode, pinModalState.step]);
+
+  // ── end PIN Lock System ──────────────────────────────────────────────────────
+
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [switchingPlan, setSwitchingPlan] = useState<string | null>(null);
   const [expiryBannerDismissed, setExpiryBannerDismissed] = useState<boolean>(() => {
@@ -982,7 +1122,7 @@ export const RestaurantDashboard: React.FC = () => {
         <NotchedBottomBar
           variant="kitchen_dashboard"
           activeTab={activeTab}
-          onTabChange={(tab) => setActiveTab(tab)}
+          onTabChange={(tab) => triggerTabChange(tab)}
           activeOrdersCount={activeOrders.length}
           waiterCallsCount={isVendor ? 0 : restaurantCalls.length}
           totalDishesCount={allDishes.length}
@@ -1165,7 +1305,7 @@ export const RestaurantDashboard: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('archive')}
+              onClick={() => triggerTabChange('archive')}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                 activeTab === 'archive'
                   ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -1174,10 +1314,11 @@ export const RestaurantDashboard: React.FC = () => {
             >
               <Calendar className="w-4 h-4 shrink-0" />
               <span>Archive & Reports</span>
+              {getStoredPin() && !isPinSessionUnlocked() && <Lock className="w-3 h-3 ml-auto text-amber-400/70 shrink-0" />}
             </button>
 
             <button
-              onClick={() => setActiveTab('tables')}
+              onClick={() => triggerTabChange('tables')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                 activeTab === 'tables'
                   ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -1188,13 +1329,16 @@ export const RestaurantDashboard: React.FC = () => {
                 <QrCode className="w-4 h-4 shrink-0" />
                 <span>{isVendor ? 'Counter QR & Links' : 'Table QR Codes'}</span>
               </div>
-              {!isVendor && (
-                <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
-              )}
+              <div className="flex items-center gap-1.5">
+                {!isVendor && (
+                  <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
+                )}
+                {getStoredPin() && !isPinSessionUnlocked() && <Lock className="w-3 h-3 text-amber-400/70 shrink-0" />}
+              </div>
             </button>
 
             <button
-              onClick={() => setActiveTab('settings')}
+              onClick={() => triggerTabChange('settings')}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                 activeTab === 'settings'
                   ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -1203,10 +1347,11 @@ export const RestaurantDashboard: React.FC = () => {
             >
               <Settings className="w-4 h-4 shrink-0" />
               <span>Settings</span>
+              {getStoredPin() && !isPinSessionUnlocked() && <Lock className="w-3 h-3 ml-auto text-amber-400/70 shrink-0" />}
             </button>
 
             <button
-              onClick={() => setActiveTab('plan')}
+              onClick={() => triggerTabChange('plan')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                 activeTab === 'plan'
                   ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -1217,11 +1362,14 @@ export const RestaurantDashboard: React.FC = () => {
                 <CreditCard className="w-4 h-4 shrink-0" />
                 <span>Plan & Add-ons</span>
               </div>
-              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                activeTab === 'plan' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
-              }`}>
-                {(activeRestaurant.plan || (isVendor ? 'vendor' : 'basic')).toUpperCase()}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                  activeTab === 'plan' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
+                }`}>
+                  {(activeRestaurant.plan || (isVendor ? 'vendor' : 'basic')).toUpperCase()}
+                </span>
+                {getStoredPin() && !isPinSessionUnlocked() && <Lock className="w-3 h-3 text-amber-400/70 shrink-0" />}
+              </div>
             </button>
 
             <button
@@ -1275,7 +1423,7 @@ export const RestaurantDashboard: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setActiveTab('plan')}
+                onClick={() => triggerTabChange('plan')}
                 className="px-4 py-2 bg-white text-red-700 font-bold text-xs rounded-xl hover:bg-red-50 shrink-0 shadow-sm cursor-pointer"
               >
                 Renew Plan →
@@ -1308,7 +1456,7 @@ export const RestaurantDashboard: React.FC = () => {
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setActiveTab('plan')}
+                    onClick={() => triggerTabChange('plan')}
                     className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
                       isExp ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-amber-500 hover:bg-amber-400 text-neutral-950'
                     }`}
@@ -2585,6 +2733,74 @@ export const RestaurantDashboard: React.FC = () => {
                 )}
               </div>
 
+              {/* ── Owner PIN Lock / Staff Lockdown ── */}
+              <div className="p-4 bg-amber-500/5 border border-amber-500/30 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-amber-500" />
+                    <span className="font-bold text-neutral-900 text-xs">Owner PIN Lock / Staff Lockdown</span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                    getStoredPin()
+                      ? 'bg-amber-400/20 text-amber-800 border border-amber-400/40'
+                      : 'bg-neutral-200 text-neutral-600'
+                  }`}>
+                    {getStoredPin() ? '🛡️ PIN Active' : '🔓 Unlocked'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-600">
+                  Keep kitchen staff locked to active orders, menu, and inventory. Require a 4-digit PIN to access Settings, Subscription Plans, Table QR Codes, and Past Archives.
+                </p>
+
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  {getStoredPin() ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={openSetPinModal}
+                        className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Change PIN</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('Remove PIN protection? Anyone on this device will be able to access Settings, Plans, and QR codes.')) {
+                            try {
+                              localStorage.removeItem(PIN_STORAGE_KEY);
+                              sessionStorage.removeItem(PIN_SESSION_KEY);
+                            } catch {}
+                            showNotification('🔓 PIN protection removed.');
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-neutral-100 hover:bg-red-50 hover:text-red-600 text-neutral-600 rounded-xl text-xs font-bold transition-colors"
+                      >
+                        Remove PIN
+                      </button>
+                      <button
+                        type="button"
+                        onClick={lockSession}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ml-auto shadow-xs"
+                        title="Relock portal immediately"
+                      >
+                        <Lock className="w-3 h-3" />
+                        <span>Lock Portal Now</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openSetPinModal}
+                      className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Set 4-Digit Owner PIN</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Account & Session Management */}
               <div className="pt-4 border-t border-neutral-200 space-y-2">
                 <label className="block font-bold text-neutral-900 text-xs">Account Session</label>
@@ -3373,7 +3589,7 @@ export const RestaurantDashboard: React.FC = () => {
         <MultiStoreManagerModal
           isOpen={isMultiStoreOpen}
           onClose={() => setIsMultiStoreOpen(false)}
-          onOpenPricing={() => setActiveTab('plan')}
+          onOpenPricing={() => triggerTabChange('plan')}
         />
       )}
 
@@ -3481,7 +3697,7 @@ export const RestaurantDashboard: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('archive'); setIsMobileDrawerOpen(false); }}
+                  onClick={() => { triggerTabChange('archive'); setIsMobileDrawerOpen(false); }}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                     activeTab === 'archive'
                       ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -3490,10 +3706,11 @@ export const RestaurantDashboard: React.FC = () => {
                 >
                   <Calendar className="w-4 h-4 shrink-0" />
                   <span>Archive & Reports</span>
+                  {getStoredPin() && !isPinSessionUnlocked() && <Lock className="w-3 h-3 ml-auto text-amber-400/70" />}
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('tables'); setIsMobileDrawerOpen(false); }}
+                  onClick={() => { triggerTabChange('tables'); setIsMobileDrawerOpen(false); }}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                     activeTab === 'tables'
                       ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -3504,13 +3721,16 @@ export const RestaurantDashboard: React.FC = () => {
                     <QrCode className="w-4 h-4 shrink-0" />
                     <span>{isVendor ? 'Counter QR & Links' : 'Table QR Codes'}</span>
                   </div>
-                  {!isVendor && (
-                    <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {!isVendor && (
+                      <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
+                    )}
+                    {getStoredPin() && !isPinSessionUnlocked() && <Lock className="w-3 h-3 text-amber-400/70" />}
+                  </div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('settings'); setIsMobileDrawerOpen(false); }}
+                  onClick={() => { triggerTabChange('settings'); setIsMobileDrawerOpen(false); }}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                     activeTab === 'settings'
                       ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -3519,10 +3739,11 @@ export const RestaurantDashboard: React.FC = () => {
                 >
                   <Settings className="w-4 h-4 shrink-0" />
                   <span>Settings</span>
+                  {getStoredPin() && !isPinSessionUnlocked() && <Lock className="w-3 h-3 ml-auto text-amber-400/70" />}
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('plan'); setIsMobileDrawerOpen(false); }}
+                  onClick={() => { triggerTabChange('plan'); setIsMobileDrawerOpen(false); }}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                     activeTab === 'plan'
                       ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -3623,7 +3844,7 @@ export const RestaurantDashboard: React.FC = () => {
       <NotchedBottomBar
         variant="kitchen_dashboard"
         activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
+        onTabChange={(tab) => triggerTabChange(tab)}
         activeOrdersCount={activeOrders.length}
         waiterCallsCount={isVendor ? 0 : restaurantCalls.length}
         totalDishesCount={allDishes.length}
@@ -3632,6 +3853,119 @@ export const RestaurantDashboard: React.FC = () => {
         onTestChime={handleTestChime}
         isVendor={isVendor}
       />
+
+      {/* ── 4-Digit Staff Lockdown PIN Modal ── */}
+      {pinModalState.open && (() => {
+        const isUnlock = pinModalState.mode === 'unlock';
+        const isSetConfirm = (pinModalState.mode === 'set' || pinModalState.mode === 'change') && pinModalState.step === 'confirm';
+        const currentPin = isUnlock
+          ? pinModalState.enteredPin
+          : (pinModalState.step === 'enter' ? pinModalState.newPin : pinModalState.enteredPin);
+
+        const targetTabName = {
+          settings: 'Restaurant Settings',
+          plan: 'Subscription & Plans',
+          tables: isVendor ? 'Counter QR & Links' : 'Table QR Codes',
+          archive: 'Archive & Reports',
+          crm: 'Customer CRM',
+        }[pinModalState.targetTab as string] || 'Restricted Portal';
+
+        return (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className={`bg-neutral-900 border border-neutral-800 rounded-3xl max-w-xs w-full p-6 text-center shadow-2xl space-y-5 transition-transform ${
+              pinModalState.shaking ? 'translate-x-1 duration-75' : ''
+            }`}>
+              {/* Header Icon & Title */}
+              <div className="space-y-2">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <Lock className="w-7 h-7" />
+                </div>
+                <h3 className="text-base font-black text-white">
+                  {isUnlock
+                    ? 'Owner PIN Required'
+                    : isSetConfirm
+                    ? 'Confirm Your 4-Digit PIN'
+                    : 'Set 4-Digit Owner PIN'}
+                </h3>
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  {isUnlock
+                    ? `Enter PIN to access ${targetTabName}`
+                    : isSetConfirm
+                    ? 'Re-enter your 4-digit code to confirm and save'
+                    : 'Choose a 4-digit code to protect sensitive tabs from staff'}
+                </p>
+              </div>
+
+              {/* 4 Dot Indicators */}
+              <div className="flex items-center justify-center gap-4 py-2">
+                {[0, 1, 2, 3].map(i => {
+                  const filled = currentPin.length > i;
+                  return (
+                    <div
+                      key={i}
+                      className={`w-4 h-4 rounded-full transition-all duration-150 ${
+                        filled
+                          ? 'bg-amber-400 scale-125 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
+                          : 'bg-neutral-800 border-2 border-neutral-700'
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Error message */}
+              {pinModalState.error && (
+                <div className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 py-1.5 px-3 rounded-xl animate-in fade-in">
+                  {pinModalState.error}
+                </div>
+              )}
+
+              {/* Numeric Keypad */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(d => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => handlePinDigit(d)}
+                    className="h-12 rounded-2xl bg-neutral-800/80 hover:bg-neutral-700 active:bg-neutral-600 active:scale-95 text-white font-mono font-bold text-lg border border-neutral-700/60 transition-all shadow-xs cursor-pointer"
+                  >
+                    {d}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setPinModalState(s => ({ ...s, open: false }))}
+                  className="h-12 rounded-2xl bg-neutral-800/40 hover:bg-neutral-800 active:scale-95 text-neutral-400 hover:text-white font-bold text-xs border border-neutral-700/40 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePinDigit('0')}
+                  className="h-12 rounded-2xl bg-neutral-800/80 hover:bg-neutral-700 active:bg-neutral-600 active:scale-95 text-white font-mono font-bold text-lg border border-neutral-700/60 transition-all shadow-xs cursor-pointer"
+                >
+                  0
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePinBackspace}
+                  className="h-12 rounded-2xl bg-neutral-800/40 hover:bg-neutral-800 active:scale-95 text-neutral-300 hover:text-amber-400 font-bold text-sm border border-neutral-700/40 transition-all flex items-center justify-center cursor-pointer"
+                  title="Delete"
+                >
+                  ⌫
+                </button>
+              </div>
+
+              <div className="text-[11px] text-neutral-500 pt-1">
+                You can also type numbers on your keyboard
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
