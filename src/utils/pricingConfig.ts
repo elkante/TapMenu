@@ -27,7 +27,7 @@ export const DEFAULT_VENDOR_PLANS: PlanTier[] = [
     maxTables: null,
     tagline: 'Ideal for retail pop-ups, food stalls, bakeries & event vendors',
     sixMonthsIncentive: 'Save ₦1,500 (Small 6% discount · Standard features, no extra perks)',
-    annualIncentive: 'Save ₦8,000 (2 Mos Free) + 2 Free NFC Counter Stands (₦14,000 value)',
+    annualIncentive: 'Save ₦8,000 (2 Mos Free) + Priority WhatsApp & Email Support',
     features: [
       'Single Counter / Pop-Up Stand Menu',
       'Realistic 3D Flipbook Digital Showcase',
@@ -50,7 +50,7 @@ export const DEFAULT_VENDOR_PLANS: PlanTier[] = [
     maxTables: null,
     tagline: 'For high-volume vendors, multi-stall setups & busy retail markets',
     sixMonthsIncentive: 'Save ₦3,000 (Small 7% discount · Standard features, no extra perks)',
-    annualIncentive: 'Save ₦15,000 (2 Mos Free) + 5 Free NFC Counter Stands (₦35,000 value)',
+    annualIncentive: 'Save ₦15,000 (2 Mos Free) + Priority Phone & Dedicated Account Manager',
     features: [
       'Everything in Vendor Monthly',
       'Multi-Stall / Multi-Location Booth Sync',
@@ -151,7 +151,7 @@ export const DEFAULT_PLANS: PlanTier[] = [
       'Everything in Premium',
       'Multi-Branch & Central Management',
       'Custom Domain Integration (e.g. menu.brand.com)',
-      'Custom Printed Acrylic Table Stands Package',
+      'Priority Venue Onboarding & Dedicated Support',
       '99.9% High-Availability Uptime SLA',
       '24/7 VIP Concierge Support'
     ]

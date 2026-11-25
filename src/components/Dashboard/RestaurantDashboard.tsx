@@ -2787,7 +2787,7 @@ export const RestaurantDashboard: React.FC = () => {
                           const file = e.target.files?.[0];
                           if (file) {
                             try {
-                              const compressed = await compressImageToDataUrl(file, 1200);
+                              const compressed = await compressImageToDataUrl(file, 900, 0.68);
                               updateRestaurantMeta({ cacCertificateUrl: compressed, cacStatus: 'pending' });
                               showNotification('CAC certificate uploaded for verification!');
                             } catch {}
@@ -2809,7 +2809,7 @@ export const RestaurantDashboard: React.FC = () => {
                         const file = e.target.files?.[0];
                         if (file) {
                           try {
-                            const compressed = await compressImageToDataUrl(file, 1200);
+                            const compressed = await compressImageToDataUrl(file, 900, 0.68);
                             updateRestaurantMeta({ cacCertificateUrl: compressed, cacStatus: 'pending' });
                             showNotification('CAC certificate uploaded for verification!');
                           } catch {}
@@ -3192,7 +3192,7 @@ export const RestaurantDashboard: React.FC = () => {
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
                     <span>
-                      <strong>Annual VIP Plan Selected:</strong> 2 Months Free + Complimentary Smart NFC Cards / Table Stands delivered directly to your venue!
+                      <strong>Annual VIP Plan Selected:</strong> 2 Months Free + Complimentary Smart Cards & VIP Support for your venue!
                     </span>
                   </div>
                 )}

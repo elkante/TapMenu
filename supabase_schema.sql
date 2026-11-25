@@ -37,6 +37,8 @@ ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS table_limit INT DEFAULT 
 ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
 ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS design JSONB DEFAULT '{}';
 ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS tables JSONB DEFAULT '[]';
+ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS cac_certificate_url TEXT;
+ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS cac_status TEXT DEFAULT 'none';
 
 -- 2. Menu Items Table
 CREATE TABLE IF NOT EXISTS public.menu_items (

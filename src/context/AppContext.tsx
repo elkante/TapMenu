@@ -1618,13 +1618,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       targetRestaurantId = restaurants[0].id;
     }
 
-    const uniqueCallId = `call-${Date.now().toString().slice(-5)}-${Math.floor(Math.random() * 89 + 10)}`;
+    const networkDate = getNetworkVerifiedDate();
+    const uniqueCallId = `call-${networkDate.getTime().toString().slice(-5)}-${Math.floor(Math.random() * 89 + 10)}`;
     const newCall: WaiterCall = {
       id: uniqueCallId,
       restaurantId: targetRestaurantId,
       tableNumber: tableNum,
       reason,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: formatNetworkTime(networkDate),
       status: 'active'
     };
 

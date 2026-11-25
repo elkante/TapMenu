@@ -29,7 +29,7 @@ export interface OwnerSession {
  * Convert a File object from an <input type="file"> to a base64 Data URL.
  * Works immediately on all devices and offline without needing storage bucket configs.
  */
-export function fileToDataUrl(file: File, maxWidth = 1000, quality = 0.82): Promise<string> {
+export function fileToDataUrl(file: File, maxWidth = 900, quality = 0.70): Promise<string> {
   return new Promise((resolve, reject) => {
     // If not an image, read directly
     if (!file.type.startsWith('image/')) {
@@ -74,7 +74,7 @@ export function fileToDataUrl(file: File, maxWidth = 1000, quality = 0.82): Prom
         }
 
         ctx.drawImage(img, 0, 0, width, height);
-        const compressed = canvas.toDataURL('image/jpeg', 0.82);
+        const compressed = canvas.toDataURL('image/jpeg', quality || 0.70);
         resolve(compressed);
       };
       img.onerror = () => resolve(rawUrl);

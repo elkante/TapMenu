@@ -45,8 +45,9 @@ function getItemPrice(ci: any): number {
 }
 
 function useTicketAge(order: Order, _tick: number) {
-  const ts = order.createdAtTimestamp || Date.now();
-  const mins = Math.max(0, Math.floor((Date.now() - ts) / 60000));
+  const currentNetworkTime = getNetworkVerifiedDate().getTime();
+  const ts = order.createdAtTimestamp || currentNetworkTime;
+  const mins = Math.max(0, Math.floor((currentNetworkTime - ts) / 60000));
   if (mins < 10) return { label: `${mins}m`, urgency: 'ok' as const };
   if (mins < 20) return { label: `${mins}m`, urgency: 'warning' as const };
   return { label: `${mins}m ⚠`, urgency: 'urgent' as const };
@@ -298,7 +299,6 @@ export const KitchenDisplay: React.FC<Props> = ({
 
   const [tick, setTick] = useState(0);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
-  const [testingChime, setTestingChime] = useState(false);
   const [liveClock, setLiveClock] = useState(() => formatNetworkTime());
   const [liveDate, setLiveDate] = useState(() => formatNetworkDate());
   
@@ -371,12 +371,6 @@ export const KitchenDisplay: React.FC<Props> = ({
   const readyOrders = byStatus('ready');
   const activeCount = pendingOrders.length + preparingOrders.length + readyOrders.length;
 
-  const handleTestChime = () => {
-    setTestingChime(true);
-    playKitchenChime();
-    setTimeout(() => setTestingChime(false), 1200);
-  };
-
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col font-sans select-none">
 
@@ -411,16 +405,6 @@ export const KitchenDisplay: React.FC<Props> = ({
 
         {/* Right: controls */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <button
-            onClick={handleTestChime}
-            className={`p-2 rounded-xl transition-all active:scale-95 ${
-              testingChime ? 'bg-amber-500 text-neutral-950' : 'bg-neutral-800 text-neutral-400 hover:text-amber-400 border border-neutral-700'
-            }`}
-            title="Test buzzer"
-          >
-            <Volume2 className="w-4 h-4" />
-          </button>
-
           {/* Day shift toggle */}
           {shiftData.isActive ? (
             <button

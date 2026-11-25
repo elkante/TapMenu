@@ -155,6 +155,8 @@ export const SuperAdminView: React.FC = () => {
   const [newPlan, setNewPlan] = useState<'Basic' | 'Standard' | 'Premium' | 'Enterprise' | 'Vendor'>('Standard');
   const [qrModalTenant, setQrModalTenant] = useState<RestaurantTenant | null>(null);
   const [selectedTableIdx, setSelectedTableIdx] = useState<number>(0);
+  const [viewingCacModal, setViewingCacModal] = useState<{ url: string; tenantName: string; tenantId: string; status: string } | null>(null);
+  const [cacFilterOnly, setCacFilterOnly] = useState(false);
 
   // Load all restaurants from Supabase (merging local cache)
   const loadAllTenants = async () => {
@@ -475,9 +477,13 @@ export const SuperAdminView: React.FC = () => {
 
   const vendorCount = tenants.filter(isVendorTenant).length;
   const restaurantCount = tenants.filter(t => !isVendorTenant(t)).length;
+  const pendingCacCount = tenants.filter(t => t.cacCertificateUrl && t.cacStatus !== 'verified').length;
 
   // Filtered tenants by search query & category filter (All, Restaurants, Vendors)
   const filteredTenants = tenants.filter(t => {
+    if (cacFilterOnly && (!t.cacCertificateUrl || t.cacStatus === 'verified')) {
+      return false;
+    }
     const query = searchQuery.toLowerCase().trim();
     const matchesSearch = !query || 
       t.name.toLowerCase().includes(query) ||
@@ -887,6 +893,20 @@ export const SuperAdminView: React.FC = () => {
                   <Zap className="w-3 h-3" />
                   <span>Street Vendors ({vendorCount})</span>
                 </button>
+
+                {/* CAC Pending Filter */}
+                <button
+                  type="button"
+                  onClick={() => setCacFilterOnly(f => !f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    cacFilterOnly
+                      ? 'bg-blue-500 text-white shadow-sm'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+                  }`}
+                >
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>CAC Pending {pendingCacCount > 0 && `(${pendingCacCount})`}</span>
+                </button>
               </div>
 
               {/* Search & Sync Bar */}
@@ -1153,6 +1173,23 @@ export const SuperAdminView: React.FC = () => {
                                 <QrCode className="w-3.5 h-3.5" />
                                 <span>QR & Links</span>
                               </button>
+
+                              {/* CAC Review button — only shown if tenant has uploaded a CAC doc */}
+                              {t.cacCertificateUrl && (
+                                <button
+                                  onClick={() => setViewingCacModal({ url: t.cacCertificateUrl!, tenantName: t.name, tenantId: t.id, status: t.cacStatus || 'pending' })}
+                                  className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] transition-colors flex items-center gap-1 cursor-pointer border ${
+                                    t.cacStatus === 'verified'
+                                      ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                      : 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/30'
+                                  }`}
+                                  title="Review CAC registration document"
+                                >
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                  <span>{t.cacStatus === 'verified' ? '✓ CAC' : '⏳ CAC'}</span>
+                                </button>
+                              )}
+
                               <button
                                 onClick={() => handleLoginAs(t)}
                                 className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg font-bold text-[11px] transition-colors"
@@ -2239,6 +2276,62 @@ export const SuperAdminView: React.FC = () => {
         hasPlanChanges={hasPlanChanges}
         onLockSession={handleLock}
       />
+      {/* ── CAC Review Modal ── */}
+      {viewingCacModal && (
+        <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4" onClick={() => setViewingCacModal(null)}>
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">CAC Document Review</p>
+                <h3 className="text-white font-bold text-sm mt-0.5">{viewingCacModal.tenantName}</h3>
+              </div>
+              <button onClick={() => setViewingCacModal(null)} className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <img
+              src={viewingCacModal.url}
+              alt="CAC Certificate"
+              className="w-full max-h-80 object-contain rounded-xl border border-neutral-700 bg-neutral-950"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  await syncRestaurantMetaToSupabase(viewingCacModal.tenantId, { cacStatus: 'verified' });
+                  setTenants(prev => prev.map(t => t.id === viewingCacModal.tenantId ? { ...t, cacStatus: 'verified' } : t));
+                  showNotification('CAC marked as verified ✓');
+                  setViewingCacModal(null);
+                }}
+                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors"
+              >
+                ✓ Mark Verified
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await syncRestaurantMetaToSupabase(viewingCacModal.tenantId, { cacStatus: 'rejected' });
+                  setTenants(prev => prev.map(t => t.id === viewingCacModal.tenantId ? { ...t, cacStatus: 'rejected' } : t));
+                  showNotification('CAC marked as rejected');
+                  setViewingCacModal(null);
+                }}
+                className="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+              >
+                ✗ Reject
+              </button>
+              <a
+                href={viewingCacModal.url}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+              >
+                Open Full
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Admin QR & Links Popup Modal ── */}
       {qrModalTenant && (() => {
         const isVendorModal = isVendorTenant(qrModalTenant);

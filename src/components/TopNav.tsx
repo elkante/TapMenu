@@ -100,7 +100,7 @@ export const TopNav: React.FC<{
         {/* Zone 2: Actions (Waiter Buzzer, Cart, and Hamburger Dropdown) */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
 
-          {/* Waiter Buzzer — chat-bubble style (Hidden for Vendors) */}
+          {/* Waiter Buzzer — only shown when no active call yet (customers tap to request) */}
           {!isVendor && (
             <div className="relative flex items-center">
               <button
@@ -111,23 +111,11 @@ export const TopNav: React.FC<{
                 <PhoneCall className="w-4 h-4 shrink-0" />
                 <span className="text-xs whitespace-nowrap hidden sm:inline">Call Waiter</span>
 
-                {/* Pulsing dot when an active call exists */}
+                {/* Pulsing dot when an active call exists for this table */}
                 {waiterCalls.filter(c => c.tableNumber === currentTable).length > 0 && (
                   <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 border-2 border-white animate-pulse" />
                 )}
               </button>
-
-              {/* Floating chat bubble — below the button, tail points UP */}
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 pointer-events-none select-none z-50">
-                {/* Tail pointing up */}
-                <span className="block w-0 h-0 mx-auto
-                  border-l-[5px] border-l-transparent
-                  border-r-[5px] border-r-transparent
-                  border-b-[6px] border-b-neutral-900" />
-                <div className="bg-neutral-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-xl whitespace-nowrap shadow-lg">
-                  👋 Call Waiter
-                </div>
-              </div>
             </div>
           )}
 
