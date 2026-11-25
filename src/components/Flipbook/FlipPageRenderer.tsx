@@ -47,6 +47,7 @@ interface FlipPageRendererProps {
   onSelectItem?: (item: FoodItem) => void;
   onAddToCart?: (item: FoodItem, e: React.MouseEvent) => void;
   onOpenReviews?: () => void;
+  hasReviewLinks?: boolean;
   pageNumberDisplay?: string | number;
 }
 
@@ -63,6 +64,7 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
   onSelectItem,
   onAddToCart,
   onOpenReviews,
+  hasReviewLinks = false,
   pageNumberDisplay,
 }) => {
   const coverThemeColor = design.coverColor || design.primaryColor || '#0c2e22';
@@ -249,8 +251,8 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
             </div>
           </div>
 
-          {/* Leave Us a Review Button */}
-          {onOpenReviews && (
+          {/* Leave Us a Review Button (ONLY shown if owner has configured links) */}
+          {hasReviewLinks && onOpenReviews && (
             <div>
               <button
                 type="button"

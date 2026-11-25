@@ -90,7 +90,7 @@ export const RestaurantDashboard: React.FC = () => {
   const PIN_STORAGE_KEY = `tapmenu_pin_${activeRestaurant?.id}`;
   const PIN_SESSION_KEY = `tapmenu_pin_unlocked_${activeRestaurant?.id}`;
   /** Tabs that require PIN to access */
-  const LOCKED_TABS = new Set(['settings', 'plan', 'tables', 'archive']);
+  const LOCKED_TABS = new Set(['settings', 'plan', 'tables', 'archive', 'crm']);
 
   const getStoredPin = (): string | null => {
     try { return localStorage.getItem(PIN_STORAGE_KEY); } catch { return null; }
@@ -1373,7 +1373,7 @@ export const RestaurantDashboard: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('crm')}
+              onClick={() => triggerTabChange('crm')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                 activeTab === 'crm'
                   ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -1384,11 +1384,14 @@ export const RestaurantDashboard: React.FC = () => {
                 <Users className="w-4 h-4 shrink-0" />
                 <span>Customers</span>
               </div>
-              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                activeTab === 'crm' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
-              }`}>
-                CRM
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                  activeTab === 'crm' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
+                }`}>
+                  CRM
+                </span>
+                {getStoredPin() && !isPinSessionUnlocked() && <Lock className="w-3 h-3 text-amber-400/70 shrink-0" />}
+              </div>
             </button>
           </nav>
 
@@ -3816,7 +3819,7 @@ export const RestaurantDashboard: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('crm'); setIsMobileDrawerOpen(false); }}
+                  onClick={() => { triggerTabChange('crm'); setIsMobileDrawerOpen(false); }}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
                     activeTab === 'crm'
                       ? 'bg-amber-500 text-neutral-950 shadow-sm'
@@ -3827,11 +3830,14 @@ export const RestaurantDashboard: React.FC = () => {
                     <Users className="w-4 h-4 shrink-0" />
                     <span>Customers</span>
                   </div>
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                    activeTab === 'crm' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
-                  }`}>
-                    CRM
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                      activeTab === 'crm' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
+                    }`}>
+                      CRM
+                    </span>
+                    {getStoredPin() && !isPinSessionUnlocked() && <Lock className="w-3 h-3 text-amber-400/70 shrink-0" />}
+                  </div>
                 </button>
               </nav>
 

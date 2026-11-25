@@ -35,6 +35,10 @@ export const FlipbookViewer: React.FC = () => {
   const [contentsOpen, setContentsOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
+
+  const instagramUrl = ((activeRestaurant as any)?.instagramUrl || ((activeRestaurant?.design as any)?.instagramUrl) || '').trim();
+  const tiktokUrl = ((activeRestaurant as any)?.tiktokUrl || ((activeRestaurant?.design as any)?.tiktokUrl) || '').trim();
+  const hasReviewLinks = Boolean(instagramUrl || tiktokUrl);
   const [itemQuantity, setItemQuantity] = useState(1);
   const [itemNotes, setItemNotes] = useState('');
   const [isFlipping, setIsFlipping] = useState(false);
@@ -284,6 +288,7 @@ export const FlipbookViewer: React.FC = () => {
                     restaurantAddress={activeRestaurant?.address}
                     isCover={currentPageIndex === 0 || currentPage.layout === 'cover'}
                     coverImage={activeRestaurant?.coverImage || currentPage.backgroundImage}
+                    hasReviewLinks={hasReviewLinks}
                     onOpenReviews={() => setIsReviewModalOpen(true)}
                     onSelectItem={(it) => {
                       if (!it.isSoldOut) setSelectedItem(it);
@@ -561,11 +566,8 @@ export const FlipbookViewer: React.FC = () => {
             {/* Social Platform Action Buttons */}
             <div className="space-y-2.5 pt-1">
               {/* Instagram */}
-              {(() => {
-                const igUrl = (activeRestaurant as any)?.instagramUrl || 
-                  ((activeRestaurant?.design as any)?.instagramUrl) || 
-                  `https://instagram.com/${(activeRestaurant?.slug || 'restaurant').replace(/[^a-z0-9_.]/g, '')}`;
-                const cleanIg = igUrl.startsWith('http') ? igUrl : `https://${igUrl}`;
+              {instagramUrl && (() => {
+                const cleanIg = instagramUrl.startsWith('http') ? instagramUrl : `https://${instagramUrl}`;
 
                 return (
                   <a
@@ -595,11 +597,8 @@ export const FlipbookViewer: React.FC = () => {
               })()}
 
               {/* TikTok */}
-              {(() => {
-                const ttUrl = (activeRestaurant as any)?.tiktokUrl || 
-                  ((activeRestaurant?.design as any)?.tiktokUrl) || 
-                  `https://tiktok.com/@${(activeRestaurant?.slug || 'restaurant').replace(/[^a-z0-9_.]/g, '')}`;
-                const cleanTt = ttUrl.startsWith('http') ? ttUrl : `https://${ttUrl}`;
+              {tiktokUrl && (() => {
+                const cleanTt = tiktokUrl.startsWith('http') ? tiktokUrl : `https://${tiktokUrl}`;
 
                 return (
                   <a

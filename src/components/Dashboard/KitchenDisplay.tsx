@@ -19,6 +19,7 @@ import {
   Package,
   UtensilsCrossed,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { playKitchenChime } from '../../utils/audio';
 import { getNetworkVerifiedDate, formatNetworkTime, formatNetworkDate } from '../../utils/networkTime';
@@ -291,6 +292,8 @@ export const KitchenDisplay: React.FC<Props> = ({
     waiterCalls,
     resolveWaiterCall,
     activeRestaurant,
+    updateRestaurantMeta,
+    showNotification,
   } = useApp();
 
   const [tick, setTick] = useState(0);
@@ -303,6 +306,33 @@ export const KitchenDisplay: React.FC<Props> = ({
   const [mobileTab, setMobileTab] = useState<MobileTab>('pending');
   const [viewingCallsModal, setViewingCallsModal] = useState(false);
   const [proofModalOrder, setProofModalOrder] = useState<Order | null>(null);
+
+  // Quick Review Links config modal
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [igInput, setIgInput] = useState('');
+  const [ttInput, setTtInput] = useState('');
+
+  const handleSaveReviewLinks = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanIg = igInput.trim() 
+      ? (igInput.startsWith('http') ? igInput.trim() : `https://instagram.com/${igInput.trim().replace(/^@/, '')}`)
+      : '';
+    const cleanTt = ttInput.trim()
+      ? (ttInput.startsWith('http') ? ttInput.trim() : `https://tiktok.com/@${ttInput.trim().replace(/^@/, '')}`)
+      : '';
+    
+    updateRestaurantMeta({
+      instagramUrl: cleanIg,
+      tiktokUrl: cleanTt,
+    });
+
+    if (cleanIg || cleanTt) {
+      showNotification('⭐ Social review links saved! "Leave Us a Review" button is now visible on your menu book cover.');
+    } else {
+      showNotification('Review links removed. "Leave Us a Review" button hidden from menu book cover.');
+    }
+    setIsReviewModalOpen(false);
+  };
 
   const currencySymbol = activeRestaurant?.design?.currencySymbol || '₦';
   const restaurantName = activeRestaurant?.name || 'Kitchen';
@@ -409,6 +439,21 @@ export const KitchenDisplay: React.FC<Props> = ({
               <span className="hidden sm:inline">Start Day</span>
             </button>
           )}
+
+          {/* Review Links Button (KDS) */}
+          <button
+            type="button"
+            onClick={() => {
+              setIgInput((activeRestaurant?.instagramUrl || '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, ''));
+              setTtInput((activeRestaurant?.tiktokUrl || '').replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, '').replace(/^@/, ''));
+              setIsReviewModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-amber-300 border border-neutral-700/80 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs"
+            title="Set Instagram & TikTok Review Links for Book Cover"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Review Links</span>
+          </button>
 
           {/* Switch to manager mode */}
           <button
@@ -806,6 +851,92 @@ export const KitchenDisplay: React.FC<Props> = ({
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Social Review Links Config Modal (Accessible from KDS) ── */}
+      {isReviewModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setIsReviewModalOpen(false)}
+        >
+          <div 
+            className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-sm w-full p-6 text-left shadow-2xl space-y-4 text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                  <Sparkles className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="font-black text-sm text-white">Social Review Links</h3>
+                  <p className="text-[10px] text-neutral-400">Configure links shown on the 3D book cover</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReviewModalOpen(false)}
+                className="text-neutral-500 hover:text-white p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-[11px] text-neutral-300 leading-relaxed">
+              When filled, diners can tap <strong className="text-amber-300">"⭐ Leave Us a Review"</strong> on the digital book cover to tag or review your food on Instagram or TikTok. If left blank, the button is completely hidden from the cover.
+            </p>
+
+            <form onSubmit={handleSaveReviewLinks} className="space-y-3 pt-1">
+              <div>
+                <label className="block font-bold text-neutral-300 text-[11px] mb-1">
+                  📸 Instagram Handle or URL
+                </label>
+                <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-neutral-400 font-mono text-xs focus-within:border-amber-500">
+                  <span className="text-neutral-500 text-[11px]">instagram.com/</span>
+                  <input
+                    type="text"
+                    placeholder="yourrestaurant"
+                    value={igInput}
+                    onChange={(e) => setIgInput(e.target.value)}
+                    className="w-full bg-transparent text-white font-bold focus:outline-none ml-1 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-300 text-[11px] mb-1">
+                  🎵 TikTok Handle or URL
+                </label>
+                <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-neutral-400 font-mono text-xs focus-within:border-amber-500">
+                  <span className="text-neutral-500 text-[11px]">tiktok.com/@</span>
+                  <input
+                    type="text"
+                    placeholder="yourrestaurant"
+                    value={ttInput}
+                    onChange={(e) => setTtInput(e.target.value)}
+                    className="w-full bg-transparent text-white font-bold focus:outline-none ml-1 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-neutral-800">
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black rounded-xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  Save Review Links
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReviewModalOpen(false)}
+                  className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
