@@ -331,9 +331,9 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
       }));
     }
   }
-  const coverColor = rRow.cover_color || designObj.coverColor || designObj.primaryColor || localMatch?.design?.coverColor || '#0c2e22';
-  const coverTextColor = rRow.cover_text_color || designObj.coverTextColor || localMatch?.design?.coverTextColor || '#D4AF37';
-  const accentColor = rRow.accent_color || designObj.accentColor || localMatch?.design?.accentColor || '#d4af37';
+  const coverColor = designObj.coverColor || designObj.primaryColor || rRow.cover_color || localMatch?.design?.coverColor || '#0c2e22';
+  const coverTextColor = designObj.coverTextColor || rRow.cover_text_color || localMatch?.design?.coverTextColor || '#D4AF37';
+  const accentColor = designObj.accentColor || rRow.accent_color || localMatch?.design?.accentColor || '#d4af37';
 
   const rawLogo = rRow.logo || localMatch?.logo || '';
   const cleanLogo = sanitizeRestaurantLogo(rawLogo, isVendor ? '⚡' : '🍽️');
