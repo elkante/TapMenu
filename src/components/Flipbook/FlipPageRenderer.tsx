@@ -231,23 +231,14 @@ export const FlipPageRenderer: React.FC<FlipPageRendererProps> = ({
 
         {/* Bottom Prompts: SWIPE TO OPEN + Leave Review */}
         <div className="relative z-10 text-center pb-6 sm:pb-8 px-6 space-y-3">
-          {/* Main Call To Action: SWIPE TO OPEN with animated directional arrow indicator */}
+          {/* Main Call To Action: SWIPE TO OPEN with bouncing left arrow */}
           <div className="flex flex-col items-center justify-center gap-1.5">
             <div 
               className="text-sm xs:text-base sm:text-lg font-black tracking-[0.22em] uppercase flex items-center justify-center gap-2 drop-shadow-md select-none"
               style={{ color: design.coverTextColor || '#D4AF37' }}
             >
               <span>SWIPE TO OPEN</span>
-              <span className="inline-block animate-pulse text-lg xs:text-xl font-bold">➔</span>
-            </div>
-
-            {/* Visual Directional Indicator Slide Pill */}
-            <div 
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-current/30 text-[10px] font-bold tracking-wider uppercase opacity-85 shadow-xs"
-              style={{ color: design.coverTextColor || '#D4AF37' }}
-            >
-              <span>Slide Left</span>
-              <span className="animate-bounce inline-block text-xs font-black">←</span>
+              <span className="inline-block animate-bounce text-lg xs:text-xl font-bold">←</span>
             </div>
           </div>
 
