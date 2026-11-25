@@ -21,6 +21,7 @@ export const OwnerHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
     restaurants, 
     activeRestaurant, 
     activeRestaurantId, 
+    ownerSession,
     switchRestaurant, 
     simulateNfcTap, 
     orders, 
@@ -28,6 +29,15 @@ export const OwnerHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
   } = useApp();
 
   if (!isOpen) return null;
+
+  const ownedRestaurants = restaurants.filter(r => {
+    if (!ownerSession) return r.id === activeRestaurantId;
+    return (
+      r.id === ownerSession.restaurantId ||
+      (ownerSession.restaurantSlug && r.slug.toLowerCase() === ownerSession.restaurantSlug.toLowerCase()) ||
+      (ownerSession.email && r.ownerEmail?.toLowerCase() === ownerSession.email.toLowerCase())
+    );
+  });
 
   const handleSelectView = (view: AppViewMode) => {
     setCurrentView(view);
@@ -65,7 +75,7 @@ export const OwnerHubModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
               Active Restaurant Tenant
             </label>
             <div className="space-y-1.5">
-              {restaurants.map((r) => (
+              {ownedRestaurants.map((r) => (
                 <button
                   key={r.id}
                   onClick={() => switchRestaurant(r.id)}

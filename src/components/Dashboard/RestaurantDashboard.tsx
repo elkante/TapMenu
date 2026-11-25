@@ -980,11 +980,12 @@ export const RestaurantDashboard: React.FC = () => {
           activeTab={activeTab}
           onTabChange={(tab) => setActiveTab(tab)}
           activeOrdersCount={activeOrders.length}
-          waiterCallsCount={restaurantCalls.length}
+          waiterCallsCount={isVendor ? 0 : restaurantCalls.length}
           totalDishesCount={allDishes.length}
-          totalTablesCount={(activeRestaurant?.tables || []).length}
+          totalTablesCount={isVendor ? 0 : (activeRestaurant?.tables || []).length}
           isTestingChime={testingChime}
           onTestChime={handleTestChime}
+          isVendor={isVendor}
         />
 
         {renderEndDayModal()}
@@ -1043,17 +1044,19 @@ export const RestaurantDashboard: React.FC = () => {
             </div>
 
             {/* Desktop Only header buttons (On Mobile, these live inside the Hamburger Side Drawer) */}
-            <button
-              onClick={() => setIsMultiStoreOpen(true)}
-              className="hidden md:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-semibold transition-colors border border-neutral-700"
-              title="Multi-Store Restaurant Branches"
-            >
-              <Store className="w-3.5 h-3.5 text-amber-400" />
-              <span>Branches</span>
-              {!(activeRestaurant.plan || '').toLowerCase().includes('standard') && !(activeRestaurant.plan || '').toLowerCase().includes('premium') && (
-                <Lock className="w-3 h-3 text-amber-500" />
-              )}
-            </button>
+            {!isVendor && (
+              <button
+                onClick={() => setIsMultiStoreOpen(true)}
+                className="hidden md:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-semibold transition-colors border border-neutral-700"
+                title="Multi-Store Restaurant Branches"
+              >
+                <Store className="w-3.5 h-3.5 text-amber-400" />
+                <span>Branches</span>
+                {!(activeRestaurant.plan || '').toLowerCase().includes('standard') && !(activeRestaurant.plan || '').toLowerCase().includes('premium') && (
+                  <Lock className="w-3 h-3 text-amber-500" />
+                )}
+              </button>
+            )}
 
             <a
               href={customerMenuUrl}
@@ -1091,7 +1094,7 @@ export const RestaurantDashboard: React.FC = () => {
               </span>
             </div>
             <div className="text-xs text-neutral-500 font-mono mt-1 truncate">
-              {allDishes.length} Dishes · {(activeRestaurant?.tables || []).length} Tables
+              {allDishes.length} Dishes{!isVendor ? ` · ${(activeRestaurant?.tables || []).length} Tables` : ' · Counter Mode'}
             </div>
           </div>
 
@@ -1181,7 +1184,9 @@ export const RestaurantDashboard: React.FC = () => {
                 <QrCode className="w-4 h-4 shrink-0" />
                 <span>{isVendor ? 'Counter QR & Links' : 'Table QR Codes'}</span>
               </div>
-              <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
+              {!isVendor && (
+                <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
+              )}
             </button>
 
             <button
@@ -3318,20 +3323,24 @@ export const RestaurantDashboard: React.FC = () => {
       {/* ========================================================= */}
       {renderEndDayModal()}
 
-      {/* Order Smart Cards Hardware Modal */}
-      <OrderSmartCardsModal
-        isOpen={isOrderCardsOpen}
-        onClose={() => setIsOrderCardsOpen(false)}
-        restaurant={activeRestaurant}
-        showNotification={showNotification}
-      />
+      {/* Order Smart Cards Hardware Modal (Restaurants only) */}
+      {!isVendor && (
+        <OrderSmartCardsModal
+          isOpen={isOrderCardsOpen}
+          onClose={() => setIsOrderCardsOpen(false)}
+          restaurant={activeRestaurant}
+          showNotification={showNotification}
+        />
+      )}
 
-      {/* Multi-Store Chain Management Hub Modal */}
-      <MultiStoreManagerModal
-        isOpen={isMultiStoreOpen}
-        onClose={() => setIsMultiStoreOpen(false)}
-        onOpenPricing={() => setActiveTab('settings')}
-      />
+      {/* Multi-Store Chain Management Hub Modal (Restaurants only) */}
+      {!isVendor && (
+        <MultiStoreManagerModal
+          isOpen={isMultiStoreOpen}
+          onClose={() => setIsMultiStoreOpen(false)}
+          onOpenPricing={() => setActiveTab('plan')}
+        />
+      )}
 
       {/* Mobile Slide-Over Navigation Drawer (Equivalent to Desktop Left Side Panel) */}
       {isMobileDrawerOpen && (
@@ -3460,7 +3469,9 @@ export const RestaurantDashboard: React.FC = () => {
                     <QrCode className="w-4 h-4 shrink-0" />
                     <span>{isVendor ? 'Counter QR & Links' : 'Table QR Codes'}</span>
                   </div>
-                  <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
+                  {!isVendor && (
+                    <span className="text-[10px] font-mono opacity-80">({(activeRestaurant?.tables || []).length})</span>
+                  )}
                 </button>
 
                 <button
@@ -3497,19 +3508,21 @@ export const RestaurantDashboard: React.FC = () => {
 
               {/* Mobile Quick Utility Actions */}
               <div className="px-3 pt-2 pb-3 space-y-1 border-t border-neutral-800">
-                <button
-                  type="button"
-                  onClick={() => { setIsMultiStoreOpen(true); setIsMobileDrawerOpen(false); }}
-                  className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Store className="w-4 h-4 text-amber-400" />
-                    <span>Branches</span>
-                  </div>
-                  {!(activeRestaurant.plan || '').toLowerCase().includes('standard') && !(activeRestaurant.plan || '').toLowerCase().includes('premium') && (
-                    <Lock className="w-3 h-3 text-amber-500" />
-                  )}
-                </button>
+                {!isVendor && (
+                  <button
+                    type="button"
+                    onClick={() => { setIsMultiStoreOpen(true); setIsMobileDrawerOpen(false); }}
+                    className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Store className="w-4 h-4 text-amber-400" />
+                      <span>Branches</span>
+                    </div>
+                    {!(activeRestaurant.plan || '').toLowerCase().includes('standard') && !(activeRestaurant.plan || '').toLowerCase().includes('premium') && (
+                      <Lock className="w-3 h-3 text-amber-500" />
+                    )}
+                  </button>
+                )}
 
                 <a
                   href={customerMenuUrl}

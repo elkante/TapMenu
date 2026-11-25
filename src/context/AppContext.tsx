@@ -527,18 +527,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch {}
 
-    // 2. Storage event listener (standard cross-tab synchronization)
+    // 2. Storage event listener (standard cross-tab synchronization — strictly scoped to active tenant)
     const handleStorageChange = (e: StorageEvent) => {
       if (!isMounted) return;
+      const belongsToTenant = (restId?: string) =>
+        Boolean(restId) && (restId === targetRestId || (Boolean(targetSlug) && restId!.toLowerCase() === targetSlug.toLowerCase()));
+
       if (e.key === STORAGE_KEY_ORDERS && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed)) {
+            const scoped = parsed.filter((o: any) => belongsToTenant(o?.restaurantId));
             setOrders(prev => {
               const prevIds = new Set(prev.map(o => o.id));
-              const hasNew = parsed.some(o => !prevIds.has(o.id));
+              const hasNew = scoped.some(o => !prevIds.has(o.id));
               if (hasNew && !isCustomerRoute) playKitchenChime();
-              return parsed;
+              return scoped;
             });
           }
         } catch {}
@@ -546,7 +550,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed)) {
-            setWaiterCalls(parsed);
+            setWaiterCalls(parsed.filter((c: any) => belongsToTenant(c?.restaurantId)));
           }
         } catch {}
       } else if (e.key === KEY_RESTAURANTS && e.newValue) {
@@ -608,6 +612,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             (payload: any) => {
               if (!isMounted || !payload.new) return;
               const row = payload.new;
+              const matchesRest = row.id === targetRestId || (targetSlug && row.slug === targetSlug);
+              if (!matchesRest) return;
               setRestaurants(prev => prev.map(r => {
                 if (r.id === row.id || r.slug === row.slug) {
                   return {
@@ -697,6 +703,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 });
               } else if (payload.eventType === 'UPDATE' && payload.new) {
                 const row = payload.new;
+                const matchesRest = row.restaurant_id === targetRestId || (targetSlug && row.restaurant_id === targetSlug);
+                if (!matchesRest) return;
                 setOrders(prev => prev.map(o => o.id === row.id ? { ...o, status: row.status } : o));
               } else if (payload.eventType === 'DELETE' && payload.old) {
                 setOrders(prev => prev.filter(o => o.id !== payload.old.id));
@@ -897,12 +905,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetSlug = activeRestaurant.slug || requestedSlug || ownerSession?.restaurantSlug || '';
 
     const pendingOrders = orders.filter(o => {
-      const match = !o.restaurantId || o.restaurantId === targetRestId || (targetSlug && o.restaurantId.toLowerCase() === targetSlug.toLowerCase());
+      const match = Boolean(o.restaurantId) && (o.restaurantId === targetRestId || (Boolean(targetSlug) && o.restaurantId.toLowerCase() === targetSlug.toLowerCase()));
       return match && (o.status === 'pending' || o.status === 'preparing');
     });
 
     const activeCalls = waiterCalls.filter(c => {
-      return !c.restaurantId || c.restaurantId === targetRestId || (targetSlug && c.restaurantId.toLowerCase() === targetSlug.toLowerCase());
+      return Boolean(c.restaurantId) && (c.restaurantId === targetRestId || (Boolean(targetSlug) && c.restaurantId.toLowerCase() === targetSlug.toLowerCase()));
     });
 
     const activeTicketCount = pendingOrders.length + activeCalls.length;
@@ -919,15 +927,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const switchRestaurant = (idOrSlug: string) => {
     const found = restaurants.find(r => r.id === idOrSlug || r.slug.toLowerCase() === idOrSlug.toLowerCase());
-    if (found) {
-      setActiveRestaurantId(found.id);
-      showNotification(`Switched to ${found.name}`);
+    if (!found) return;
+    // Strict tenant ownership check when logged in as an owner
+    if (ownerSession) {
+      const isOwned =
+        found.id === ownerSession.restaurantId ||
+        (ownerSession.restaurantSlug && found.slug.toLowerCase() === ownerSession.restaurantSlug.toLowerCase()) ||
+        (ownerSession.email && found.ownerEmail?.toLowerCase() === ownerSession.email.toLowerCase());
+      if (!isOwned) {
+        showNotification('Access denied: you can only switch to your own stores.');
+        return;
+      }
     }
+    setActiveRestaurantId(found.id);
+    showNotification(`Switched to ${found.name}`);
   };
 
   const logoutOwner = () => {
     saveActiveSession(null);
     setOwnerSessionState(null);
+    setOrders([]);
+    setWaiterCalls([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY_ORDERS);
+      localStorage.removeItem(STORAGE_KEY_CALLS);
+    } catch {}
     window.location.href = window.location.pathname;
   };
 

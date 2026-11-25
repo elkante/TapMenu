@@ -15,15 +15,26 @@ export const MultiStoreManagerModal: React.FC<MultiStoreManagerModalProps> = ({
   onClose,
   onOpenPricing
 }) => {
-  const { restaurants, activeRestaurant, switchRestaurant, showNotification } = useApp();
+  const { restaurants, activeRestaurant, ownerSession, switchRestaurant, showNotification } = useApp();
   const [newBranchName, setNewBranchName] = useState('');
   const [newBranchCity, setNewBranchCity] = useState('Lekki Phase 1, Lagos');
   const [isAdding, setIsAdding] = useState(false);
 
   if (!isOpen) return null;
 
+  // Strict tenant isolation: only show stores belonging to the logged-in owner
+  const ownedRestaurants = restaurants.filter(r => {
+    if (!ownerSession) return r.id === activeRestaurant.id;
+    return (
+      r.id === ownerSession.restaurantId ||
+      (ownerSession.restaurantSlug && r.slug.toLowerCase() === ownerSession.restaurantSlug.toLowerCase()) ||
+      (ownerSession.email && r.ownerEmail?.toLowerCase() === ownerSession.email.toLowerCase())
+    );
+  });
+
   const planId = (activeRestaurant.plan || 'basic').toLowerCase();
-  const isEligible = planId.includes('standard') || planId.includes('premium') || planId.includes('enterprise') || planId.includes('growth');
+  const isVendor = activeRestaurant.serviceMode === 'counter_only' || planId.includes('vendor');
+  const isEligible = !isVendor && (planId.includes('standard') || planId.includes('premium') || planId.includes('enterprise') || planId.includes('growth'));
 
   const handleSwitchStore = (restId: string) => {
     switchRestaurant(restId);
@@ -113,7 +124,7 @@ export const MultiStoreManagerModal: React.FC<MultiStoreManagerModalProps> = ({
             
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-extrabold text-neutral-900 text-sm">Your Chain Locations ({restaurants.length})</h4>
+                <h4 className="font-extrabold text-neutral-900 text-sm">Your Chain Locations ({ownedRestaurants.length})</h4>
                 <p className="text-[11px] text-neutral-500">Click any location below to switch active kitchen operations</p>
               </div>
 
@@ -124,7 +135,7 @@ export const MultiStoreManagerModal: React.FC<MultiStoreManagerModalProps> = ({
 
             {/* Restaurant Branches Grid */}
             <div className="space-y-2.5 max-h-[50vh] overflow-y-auto">
-              {restaurants.map(rest => {
+              {ownedRestaurants.map(rest => {
                 const isActive = rest.id === activeRestaurant.id;
 
                 return (
