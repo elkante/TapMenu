@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FlipPageRenderer } from './FlipPageRenderer';
-import { FoodItem } from '../../types';
+import { DishModifierModal } from '../DishModifierModal';
+import { FoodItem, SelectedModifier } from '../../types';
 import { playPageTurnSound } from '../../utils/audio';
 import { 
   ChevronLeft, 
@@ -287,8 +288,12 @@ export const FlipbookViewer: React.FC = () => {
                     }}
                     onAddToCart={(it) => {
                       if (!it.isSoldOut) {
-                        addToCart(it);
-                        showNotification(`🛒 Added ${it.name} to cart!`);
+                        if (it.modifierGroups && it.modifierGroups.length > 0) {
+                          setSelectedItem(it);
+                        } else {
+                          addToCart(it);
+                          showNotification(`🛒 Added ${it.name} to cart!`);
+                        }
                       }
                     }}
                     pageNumberDisplay={currentPageIndex + 1}
@@ -507,100 +512,16 @@ export const FlipbookViewer: React.FC = () => {
         </div>
       )}
 
-      {/* Dish Customization Modal */}
-      {selectedItem && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#1c1917] border border-amber-600/40 rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl">
-            {selectedItem.imageUrl && (
-              <div className="w-full h-44 relative overflow-hidden bg-neutral-950">
-                <img 
-                  src={selectedItem.imageUrl} 
-                  alt={selectedItem.name}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover" 
-                />
-                <button 
-                  onClick={() => setSelectedItem(null)}
-                  className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/90"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-                {selectedItem.badge && (
-                  <span className="absolute bottom-2.5 left-3 px-2 py-0.5 bg-[#D4AF37] text-neutral-950 font-bold text-[10px] rounded shadow">
-                    {selectedItem.badge}
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div className="p-5">
-              {!selectedItem.imageUrl && (
-                <div className="flex justify-end mb-2">
-                  <button onClick={() => setSelectedItem(null)} className="text-neutral-400 hover:text-white">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              <div className="flex items-baseline justify-between gap-3 mb-1.5">
-                <h3 className="text-base font-bold text-white truncate">{selectedItem.name}</h3>
-                <span className="font-mono text-base font-bold text-amber-400 whitespace-nowrap">
-                  {design.currencySymbol}{selectedItem.price.toLocaleString()}
-                </span>
-              </div>
-
-              <p className="text-xs text-neutral-400 leading-relaxed mb-3">
-                {selectedItem.description}
-              </p>
-
-              {/* Kitchen Notes */}
-              <div className="mb-4">
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-                  Kitchen Notes / Dietary Requests
-                </label>
-                <input
-                  type="text"
-                  value={itemNotes}
-                  onChange={(e) => setItemNotes(e.target.value)}
-                  placeholder="e.g. Extra spicy, sauce on side, no onions..."
-                  className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              {/* Quantity selector & Add Button */}
-              <div className="flex items-center justify-between gap-3 pt-3 border-t border-neutral-800">
-                <div className="flex items-center gap-2 bg-neutral-800 px-2.5 py-1.5 rounded-xl border border-neutral-700">
-                  <button
-                    onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
-                    className="text-neutral-400 hover:text-white"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="font-mono text-xs font-bold text-white w-5 text-center">
-                    {itemQuantity}
-                  </span>
-                  <button
-                    onClick={() => setItemQuantity(itemQuantity + 1)}
-                    className="text-neutral-400 hover:text-white"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <button
-                  onClick={handleAddItemToCart}
-                  className="flex-1 py-2.5 px-3 bg-[#D4AF37] hover:bg-[#e6c148] text-neutral-950 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>
-                    Add · {design.currencySymbol}{(selectedItem.price * itemQuantity).toLocaleString()}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Dish Customization & Modifiers Modal */}
+      <DishModifierModal
+        item={selectedItem}
+        currencySymbol={design.currencySymbol}
+        onClose={() => setSelectedItem(null)}
+        onConfirm={(item, notes, qty, selectedModifiers: SelectedModifier[]) => {
+          addToCart(item, notes, qty, selectedModifiers);
+          setSelectedItem(null);
+        }}
+      />
     </div>
   );
 };

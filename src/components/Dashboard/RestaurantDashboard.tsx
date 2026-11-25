@@ -51,10 +51,11 @@ import { KitchenInventoryView } from './KitchenInventoryView';
 import { KitchenExpenseView } from './KitchenExpenseView';
 import { KitchenArchiveView } from './KitchenArchiveView';
 import { KitchenDisplay } from './KitchenDisplay';
+import { CustomerCrmView } from './CustomerCrmView';
 import { OrderSmartCardsModal } from '../Hardware/OrderSmartCardsModal';
 import { MultiStoreManagerModal } from './MultiStoreManagerModal';
 import { getNetworkVerifiedDate, formatNetworkDate, formatNetworkTime } from '../../utils/networkTime';
-import { Package, DollarSign, Store, Lock, ShieldAlert, Zap, ArrowRight, Download } from 'lucide-react';
+import { Package, DollarSign, Store, Lock, ShieldAlert, Zap, ArrowRight, Download, Users } from 'lucide-react';
 
 export const RestaurantDashboard: React.FC = () => {
   const { 
@@ -83,7 +84,7 @@ export const RestaurantDashboard: React.FC = () => {
     (activeRestaurant?.design as any)?.serviceMode === 'counter_only' ||
     rawPlan.includes('vendor');
 
-  const [activeTab, setActiveTab] = useState<'kds' | 'menu' | 'inventory' | 'expenses' | 'archive' | 'tables' | 'settings' | 'plan'>('kds');
+  const [activeTab, setActiveTab] = useState<'kds' | 'menu' | 'inventory' | 'expenses' | 'archive' | 'tables' | 'settings' | 'plan' | 'crm'>('kds');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [switchingPlan, setSwitchingPlan] = useState<string | null>(null);
   const [expiryBannerDismissed, setExpiryBannerDismissed] = useState<boolean>(() => {
@@ -291,13 +292,16 @@ export const RestaurantDashboard: React.FC = () => {
         <div>
           ${(Array.isArray(order.items) ? order.items : []).map((i: any) => {
             const name = i?.foodItem?.name || i?.name || 'Item';
-            const price = Number(i?.foodItem?.price ?? i?.price ?? 0);
+            const unitPrice = Number(i?.unitPrice ?? i?.foodItem?.price ?? i?.price ?? 0);
             const qty = Number(i?.quantity) || 1;
+            const mods = Array.isArray(i?.selectedModifiers) ? i.selectedModifiers : [];
+            const modLines = mods.map((m: any) => `<div class="notes" style="color:#333;">↳ ${m.name}${m.price > 0 ? ` (+${activeRestaurant?.design?.currencySymbol || '₦'}${Number(m.price).toLocaleString()})` : ''}</div>`).join('');
             return `
               <div class="item-row">
                 <span><strong>${qty}x</strong> ${name}</span>
-                <span>${activeRestaurant?.design?.currencySymbol || '₦'}${(price * qty).toLocaleString()}</span>
+                <span>${activeRestaurant?.design?.currencySymbol || '₦'}${(unitPrice * qty).toLocaleString()}</span>
               </div>
+              ${modLines}
               ${i.notes ? `<div class="notes">* Note: ${i.notes}</div>` : ''}
             `;
           }).join('')}
@@ -1217,6 +1221,25 @@ export const RestaurantDashboard: React.FC = () => {
                 activeTab === 'plan' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
               }`}>
                 {(activeRestaurant.plan || (isVendor ? 'vendor' : 'basic')).toUpperCase()}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('crm')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                activeTab === 'crm'
+                  ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Users className="w-4 h-4 shrink-0" />
+                <span>Customers</span>
+              </div>
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                activeTab === 'crm' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
+              }`}>
+                CRM
               </span>
             </button>
           </nav>
@@ -3039,6 +3062,18 @@ export const RestaurantDashboard: React.FC = () => {
       </main>
       </div>
 
+      {/* ========================================================= */}
+      {/* TAB: CUSTOMER CRM & LOYALTY HUB                           */}
+      {/* ========================================================= */}
+      {activeTab === 'crm' && (
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5">
+          <CustomerCrmView
+            restaurantId={activeRestaurant.id}
+            currencySymbol={activeRestaurant.design?.currencySymbol || '₦'}
+          />
+        </main>
+      )}
+
       {/* Modal: Add or Edit Food Item */}
       {isAddItemOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
@@ -3502,6 +3537,25 @@ export const RestaurantDashboard: React.FC = () => {
                     activeTab === 'plan' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
                   }`}>
                     {(activeRestaurant.plan || (isVendor ? 'vendor' : 'basic')).toUpperCase()}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('crm'); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                    activeTab === 'crm'
+                      ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Users className="w-4 h-4 shrink-0" />
+                    <span>Customers</span>
+                  </div>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                    activeTab === 'crm' ? 'bg-neutral-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
+                  }`}>
+                    CRM
                   </span>
                 </button>
               </nav>

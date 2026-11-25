@@ -209,6 +209,21 @@ const TicketCard: React.FC<{
                     📝 Note: {ci.notes}
                   </div>
                 )}
+                {ci.selectedModifiers && ci.selectedModifiers.length > 0 && (
+                  <div className="text-xs text-amber-200 bg-amber-400/10 border border-amber-400/20 px-2 py-1 rounded-lg mt-1 space-y-0.5">
+                    {ci.selectedModifiers.map((m, mi) => (
+                      <div key={mi} className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-amber-400 text-[10px]">▶</span>
+                        <span className="font-semibold">{m.name}</span>
+                        {m.price > 0 && (
+                          <span className="font-mono text-amber-300 text-[11px] font-bold">
+                            +{currencySymbol}{m.price.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <span className={`font-mono text-xs shrink-0 font-semibold ${checked ? 'text-neutral-600 line-through' : 'text-neutral-300'}`}>
                 {currencySymbol}{(price * qty).toLocaleString()}

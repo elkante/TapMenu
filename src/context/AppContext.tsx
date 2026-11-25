@@ -10,8 +10,10 @@ import {
   CartItem, 
   Order, 
   WaiterCall,
-  TableNfcTag
+  TableNfcTag,
+  SelectedModifier
 } from '../types';
+import { recordOrderToCustomerCrm } from '../utils/crmStorage';
 import { INITIAL_RESTAURANTS, TEMPLATE_PRESETS, createDefaultRestaurantTenant } from '../data/initialData';
 import { playKitchenChime } from '../utils/audio';
 import { notifyKitchenNewTicket, setAppBadgeCount } from '../utils/pwaNotifications';
@@ -93,7 +95,7 @@ interface AppContextType {
   simulateNfcTap: (tableNumber: string) => void;
 
   // Ordering & Waiter Actions
-  addToCart: (item: FoodItem, notes?: string, qty?: number) => void;
+  addToCart: (item: FoodItem, notes?: string, qty?: number, selectedModifiers?: SelectedModifier[]) => void;
   updateCartItemQuantity: (index: number, quantity: number) => void;
   updateCartItemType: (index: number, itemType: 'dine_in' | 'takeaway') => void;
   updateCartItemNotes: (index: number, notes: string) => void;
@@ -1421,10 +1423,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Cart & Ordering
-  const addToCart = (item: FoodItem, notes?: string, qty: number = 1) => {
+  const addToCart = (item: FoodItem, notes?: string, qty: number = 1, selectedModifiers?: SelectedModifier[]) => {
+    const cleanMods = (selectedModifiers || []).slice().sort((a, b) => a.optionId.localeCompare(b.optionId));
+    const modKey = cleanMods.map(m => m.optionId).join('|');
+    const modTotal = cleanMods.reduce((sum, m) => sum + (Number(m.price) || 0), 0);
+    const effectiveUnitPrice = (Number(item.price) || 0) + modTotal;
+
     setCart(prev => {
       const cleanNotes = (notes || '').trim();
-      const existingIdx = prev.findIndex(ci => ci.foodItem.id === item.id && (ci.notes || '').trim() === cleanNotes);
+      const existingIdx = prev.findIndex(ci => {
+        const ciModKey = (ci.selectedModifiers || []).slice().sort((a, b) => a.optionId.localeCompare(b.optionId)).map(m => m.optionId).join('|');
+        return ci.foodItem.id === item.id && (ci.notes || '').trim() === cleanNotes && ciModKey === modKey;
+      });
       if (existingIdx !== -1) {
         return prev.map((ci, idx) => idx === existingIdx ? { ...ci, quantity: ci.quantity + qty } : ci);
       }
@@ -1434,7 +1444,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           foodItem: item,
           quantity: qty,
           notes: cleanNotes || undefined,
-          tableNumber: currentTable || 'Table 1'
+          tableNumber: currentTable || 'Table 1',
+          selectedModifiers: cleanMods.length > 0 ? cleanMods : undefined,
+          unitPrice: effectiveUnitPrice,
         }
       ];
     });
@@ -1486,7 +1498,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ): Order | null => {
     if (cart.length === 0) return null;
 
-    const calcSubtotal = extraDetails?.subtotal ?? cart.reduce((sum, ci) => sum + (ci.foodItem?.price ?? (ci as any).price ?? 0) * ci.quantity, 0);
+    const calcSubtotal = extraDetails?.subtotal ?? cart.reduce((sum, ci) => sum + (ci.unitPrice ?? ci.foodItem?.price ?? (ci as any).price ?? 0) * ci.quantity, 0);
     const packagingFee = extraDetails?.packagingFee ?? 0;
     const deliveryFee = extraDetails?.deliveryFee ?? 0;
     const calcVat = extraDetails?.vat ?? Math.round((calcSubtotal + packagingFee + deliveryFee) * 0.075);
@@ -1584,8 +1596,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Realtime instant broadcast error:', e);
     }
 
-    // 3. Database persistence in background
+    // 3. Database persistence + Tenant CRM capture in background
     syncOrderToSupabase(newOrder);
+    if (targetRestaurantId) {
+      recordOrderToCustomerCrm(targetRestaurantId, newOrder);
+    }
 
     showNotification(`🎉 Order sent to ${activeRestaurant.name || 'kitchen'} from ${orderTable}!`);
     return newOrder;

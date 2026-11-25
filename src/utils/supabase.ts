@@ -175,6 +175,7 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
       }
 
       if (!itemsByCategory[cat]) itemsByCategory[cat] = [];
+      const localItemMatch = localMatch?.pages?.flatMap(p => p.items || []).find(li => li.id === it.id);
       itemsByCategory[cat].push({
         id: it.id,
         name: it.name,
@@ -184,7 +185,10 @@ function mapDbRowToRestaurant(rRow: any, itemRows: any[] = []): RestaurantTenant
         badge: it.badge || undefined,
         isSoldOut: Boolean(it.is_sold_out),
         prepTime: it.prep_time || '15 min',
-        allergens: it.allergens || []
+        allergens: it.allergens || [],
+        modifierGroups: Array.isArray(it.modifiers) && it.modifiers.length > 0
+          ? it.modifiers
+          : (localItemMatch?.modifierGroups || undefined)
       });
     });
   }
@@ -1056,7 +1060,7 @@ export async function saveDishToSupabase(
       return { success: false, error: 'Restaurant ID not found' };
     }
 
-    const { error } = await supabase.from('menu_items').upsert({
+    const baseDishPayload = {
       id: item.id,
       restaurant_id: resolvedRestId,
       category: cleanCat,
@@ -1068,7 +1072,17 @@ export async function saveDishToSupabase(
       prep_time: item.prepTime || '15 min',
       allergens: item.allergens || [],
       is_sold_out: Boolean(item.isSoldOut)
+    };
+
+    let { error } = await supabase.from('menu_items').upsert({
+      ...baseDishPayload,
+      modifiers: item.modifierGroups || []
     }, { onConflict: 'id' });
+
+    if (error && (error.code === '42703' || error.message?.includes('modifiers'))) {
+      const retry = await supabase.from('menu_items').upsert(baseDishPayload, { onConflict: 'id' });
+      error = retry.error;
+    }
 
     if (error) {
       console.error('Supabase save dish error:', error);

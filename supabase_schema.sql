@@ -273,3 +273,40 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.admin_delete_user(UUID) TO anon, authenticated, service_role;
 
+-- =========================================================================
+-- Dish Modifiers (Swallow, Protein, Spice, Extras) & Customer CRM
+-- =========================================================================
+ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS service_mode TEXT DEFAULT 'table_service';
+ALTER TABLE public.menu_items ADD COLUMN IF NOT EXISTS modifiers JSONB DEFAULT '[]';
+
+ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_order_type_check;
+ALTER TABLE public.orders
+ADD CONSTRAINT orders_order_type_check
+CHECK (order_type IN ('dine_in', 'takeaway', 'both', 'delivery'));
+
+CREATE TABLE IF NOT EXISTS public.customers (
+    id TEXT PRIMARY KEY,
+    restaurant_id TEXT NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    normalized_phone TEXT NOT NULL,
+    total_orders INT DEFAULT 0,
+    total_spend NUMERIC DEFAULT 0,
+    last_order_at BIGINT,
+    last_order_type TEXT DEFAULT 'dine_in',
+    favorite_items JSONB DEFAULT '{}',
+    tags TEXT[] DEFAULT '{}',
+    notes TEXT DEFAULT '',
+    created_at BIGINT,
+    UNIQUE (restaurant_id, normalized_phone)
+);
+
+CREATE INDEX IF NOT EXISTS idx_customers_restaurant ON public.customers(restaurant_id);
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'customers' AND policyname = 'Allow public access to customers') THEN
+    CREATE POLICY "Allow public access to customers" ON public.customers FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+

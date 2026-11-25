@@ -246,12 +246,16 @@ export const QuickMenuView: React.FC<{ onSelectItem: (item: FoodItem) => void }>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      addToCart(item);
+                      if (item.modifierGroups && item.modifierGroups.length > 0) {
+                        onSelectItem(item);
+                      } else {
+                        addToCart(item);
+                      }
                     }}
                     className="flex items-center gap-1 px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold rounded-lg transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Add to Order</span>
+                    <span>{item.modifierGroups && item.modifierGroups.length > 0 ? 'Customize' : 'Add to Order'}</span>
                   </button>
                 )}
               </div>

@@ -51,6 +51,31 @@ export interface MenuBookDesign {
   currencySymbol: string;
 }
 
+export interface ModifierOption {
+  id: string;
+  name: string;
+  price: number;
+  isDefault?: boolean;
+  isSoldOut?: boolean;
+}
+
+export interface ModifierGroup {
+  id: string;
+  title: string;
+  selectionType: 'single' | 'multiple';
+  required: boolean;
+  maxSelect?: number;
+  options: ModifierOption[];
+}
+
+export interface SelectedModifier {
+  groupId: string;
+  groupTitle: string;
+  optionId: string;
+  name: string;
+  price: number;
+}
+
 export interface FoodItem {
   id: string;
   name: string;
@@ -62,6 +87,7 @@ export interface FoodItem {
   prepTime?: string;
   calories?: string;
   allergens?: string[];
+  modifierGroups?: ModifierGroup[];
 }
 
 export interface MenuBookPage {
@@ -143,6 +169,26 @@ export interface CartItem {
   tableNumber?: string;
   /** Per-item: whether this item is eaten here or packed to go */
   itemType?: 'dine_in' | 'takeaway';
+  /** Selected Nigerian dish modifiers / extras (Swallow, Protein, Spice, etc.) */
+  selectedModifiers?: SelectedModifier[];
+  /** Effective unit price = base price + sum of selected modifier prices */
+  unitPrice?: number;
+}
+
+export interface CustomerProfile {
+  id: string;
+  restaurantId: string;
+  name: string;
+  phone: string;
+  normalizedPhone: string;
+  totalOrders: number;
+  totalSpend: number;
+  lastOrderAt: number;
+  lastOrderType?: string;
+  favoriteItems: Record<string, number>;
+  tags: string[];
+  notes?: string;
+  createdAt: number;
 }
 
 export interface Order {

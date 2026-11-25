@@ -11,8 +11,9 @@ import { AuthPortal } from './components/Auth/AuthPortal';
 import { PricingPage } from './components/Pricing/PricingPage';
 import { SuperAdminView } from './components/SuperAdmin/SuperAdminView';
 import { SplashScreen } from './components/SplashScreen';
-import { FoodItem } from './types';
-import { Sparkles, Plus, Minus, X, AlertCircle, Store, ArrowRight } from 'lucide-react';
+import { DishModifierModal } from './components/DishModifierModal';
+import { FoodItem, SelectedModifier } from './types';
+import { Sparkles, Store, ArrowRight } from 'lucide-react';
 
 const MainContent: React.FC = () => {
   const { 
@@ -29,8 +30,6 @@ const MainContent: React.FC = () => {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [waiterModalOpen, setWaiterModalOpen] = useState(false);
   const [modalItem, setModalItem] = useState<FoodItem | null>(null);
-  const [modalItemQty, setModalItemQty] = useState(1);
-  const [modalItemNotes, setModalItemNotes] = useState('');
 
   // Standalone page routing (?page=pricing, secret /sys-hq)
   const [showPricing, setShowPricing] = useState(() => {
@@ -70,13 +69,11 @@ const MainContent: React.FC = () => {
 
   const handleOpenItem = (item: FoodItem) => {
     setModalItem(item);
-    setModalItemQty(1);
-    setModalItemNotes('');
   };
 
-  const handleConfirmAddToCart = () => {
-    if (!modalItem || modalItem.isSoldOut) return;
-    addToCart(modalItem, modalItemNotes, modalItemQty);
+  const handleConfirmAddToCart = (item: FoodItem, notes: string, qty: number, selectedModifiers: SelectedModifier[]) => {
+    if (!item || item.isSoldOut) return;
+    addToCart(item, notes, qty, selectedModifiers);
     setModalItem(null);
   };
 
@@ -195,119 +192,13 @@ const MainContent: React.FC = () => {
         onClose={() => setWaiterModalOpen(false)}
       />
 
-      {/* Dish Customization Modal */}
-      {modalItem && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl">
-            {modalItem.imageUrl && (
-              <div className="w-full h-48 relative overflow-hidden bg-neutral-100">
-                <img
-                  src={modalItem.imageUrl}
-                  alt={modalItem.name}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  onClick={() => setModalItem(null)}
-                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/90"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                {modalItem.badge && (
-                  <span className="absolute bottom-3 left-3 px-2.5 py-1 bg-amber-500 text-neutral-950 font-bold text-xs rounded-lg shadow-sm">
-                    {modalItem.badge}
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div className="p-6">
-              {!modalItem.imageUrl && (
-                <div className="flex justify-end mb-2">
-                  <button onClick={() => setModalItem(null)} className="text-neutral-400 hover:text-neutral-900">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
-
-              <div className="flex items-baseline justify-between gap-4 mb-2">
-                <h3 className="text-lg font-bold text-neutral-900">{modalItem.name}</h3>
-                <span className="font-mono text-lg font-bold text-amber-800">
-                  {activeRestaurant.design.currencySymbol}{modalItem.price.toLocaleString()}
-                </span>
-              </div>
-
-              <p className="text-xs text-neutral-500 leading-relaxed mb-3">
-                {modalItem.description}
-              </p>
-
-              {(modalItem.prepTime || (modalItem.allergens && modalItem.allergens.length > 0)) && (
-                <div className="flex flex-wrap items-center gap-2 mb-4 text-[11px]">
-                  {modalItem.prepTime && (
-                    <span className="px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded-md font-medium">
-                      ⏱ {modalItem.prepTime}
-                    </span>
-                  )}
-                  {modalItem.allergens && modalItem.allergens.length > 0 && (
-                    <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-medium">
-                      ⚠️ Allergens: {modalItem.allergens.join(', ')}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="mb-4">
-                <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">
-                  Kitchen Notes / Special Requests
-                </label>
-                <input
-                  type="text"
-                  value={modalItemNotes}
-                  onChange={(e) => setModalItemNotes(e.target.value)}
-                  placeholder="e.g. Extra hot yaji, sauce on side, no onions..."
-                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-900 focus:outline-none focus:border-neutral-900"
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-4 pt-4 border-t border-neutral-100">
-                <div className="flex items-center gap-3 bg-neutral-100 px-3 py-1.5 rounded-xl border border-neutral-200">
-                  <button
-                    onClick={() => setModalItemQty(Math.max(1, modalItemQty - 1))}
-                    className="text-neutral-600 hover:text-neutral-900"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <span className="font-mono text-sm font-bold text-neutral-900 w-6 text-center">
-                    {modalItemQty}
-                  </span>
-                  <button
-                    onClick={() => setModalItemQty(modalItemQty + 1)}
-                    className="text-neutral-600 hover:text-neutral-900"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {modalItem.isSoldOut ? (
-                  <div className="flex-1 py-3 px-4 bg-neutral-200 text-neutral-500 font-bold rounded-xl text-xs text-center">
-                    Currently Sold Out
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleConfirmAddToCart}
-                    className="flex-1 py-3 px-4 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <Plus className="w-4 h-4 text-amber-400" />
-                    <span>
-                      Add to Order · {activeRestaurant.design.currencySymbol}{(modalItem.price * modalItemQty).toLocaleString()}
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Dish Customization & Modifiers Modal */}
+      <DishModifierModal
+        item={modalItem}
+        currencySymbol={activeRestaurant.design.currencySymbol}
+        onClose={() => setModalItem(null)}
+        onConfirm={handleConfirmAddToCart}
+      />
     </div>
   );
 };

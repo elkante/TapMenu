@@ -59,7 +59,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
   const isTakeout  = topOrderMode === 'takeaway' || isDelivery;
   const orderType  = isDelivery ? 'delivery' : isTakeout ? 'takeaway' : 'dine_in';
 
-  const subtotal     = cart.reduce((sum, ci) => sum + (ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1), 0);
+  const subtotal     = cart.reduce((sum, ci) => sum + (ci.unitPrice ?? ci.foodItem?.price ?? (ci as any).price ?? 0) * (ci.quantity || 1), 0);
   const effectivePacks = Math.max(packCount, 1);
   const packagingFee = isTakeout ? effectivePacks * packUnitPrice : 0;
   const deliveryFee  = isDelivery ? deliveryUnitPrice : 0;
@@ -230,7 +230,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                 </div>
               ) : (
                 cart.map((ci, index) => {
-                  const itemPrice = (ci.foodItem?.price ?? (ci as any).price ?? 0);
+                  const itemPrice = (ci.unitPrice ?? ci.foodItem?.price ?? (ci as any).price ?? 0);
                   return (
                     <div
                       key={index}
@@ -242,6 +242,15 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                           <span className="font-bold text-neutral-900 block leading-tight">
                             {ci.foodItem?.name || (ci as any).name || (ci as any).title || 'Item'}
                           </span>
+                          {ci.selectedModifiers && ci.selectedModifiers.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {ci.selectedModifiers.map((m, mi) => (
+                                <span key={mi} className="px-1.5 py-0.5 rounded bg-amber-100/80 text-amber-900 text-[10px] font-medium">
+                                  + {m.name}{m.price > 0 ? ` (${design.currencySymbol}${m.price.toLocaleString()})` : ''}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {ci.notes && (
                             <div className="text-[11px] text-neutral-500 mt-0.5 italic">Note: {ci.notes}</div>
                           )}
@@ -370,7 +379,7 @@ export const CustomerCartDrawer: React.FC<{ isOpen: boolean; onClose: () => void
                     type="tel"
                     value={customerPhone}
                     onChange={e => setCustomerPhone(e.target.value)}
-                    placeholder="Phone number (optional)"
+                    placeholder="Phone Number (for order updates & VIP rewards)"
                     className="w-full px-3 py-2.5 bg-white border border-neutral-200 rounded-xl focus:outline-none focus:border-neutral-900"
                   />
                 </div>
